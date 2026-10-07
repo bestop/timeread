@@ -101,22 +101,17 @@ export async function ensureDaily(date?: string): Promise<DailyInfo> {
       return picked;
     }
 
-    // 记录存在：校验素材仍可用
-    const bgExists = record.backgroundId === 'none' ? true : await db.background.count({ where: { id: record.backgroundId } }) > 0;
-    const quoteExists = record.quoteId === 'none' ? true : await db.quote.count({ where: { id: record.quoteId } }) > 0;
+    // 记录存在：校验素材仍可用（并行查两条记录，免去逐条 count）
+    const [bg, quote] = await Promise.all([
+      record.backgroundId !== 'none'
+        ? db.background.findUnique({ where: { id: record.backgroundId }, select: { id: true, label: true, palette: true } })
+        : Promise.resolve(null),
+      record.quoteId !== 'none'
+        ? db.quote.findUnique({ where: { id: record.quoteId }, select: { id: true, content: true, footnote: true } })
+        : Promise.resolve(null),
+    ]);
 
-    let bg: { id: string; label: string; palette: string } | null = null;
-    let quote: { id: string; content: string; footnote: string | null } | null = null;
-    if (record.backgroundId !== 'none') {
-      const found = await db.background.findUnique({ where: { id: record.backgroundId }, select: { id: true, label: true, palette: true } });
-      bg = found;
-    }
-    if (record.quoteId !== 'none') {
-      const found = await db.quote.findUnique({ where: { id: record.quoteId }, select: { id: true, content: true, footnote: true } });
-      quote = found;
-    }
-
-    if ((record.backgroundId !== 'none' && !bgExists) || (record.quoteId !== 'none' && !quoteExists)) {
+    if ((record.backgroundId !== 'none' && !bg) || (record.quoteId !== 'none' && !quote)) {
       // 素材被删除 → 重新挑选并覆盖入库
       const picked = await pickAndCompose(d, record.variant, record.showDate);
       await db.dailyCard.update({
@@ -186,7 +181,8 @@ export async function ensureDaily(date?: string): Promise<DailyInfo> {
 /** 换一换：variant+1 重新随机（同日内重选，不影响往期；沿用当日显隐偏好） */
 export async function regenerateDaily(date?: string): Promise<DailyInfo> {
   const d = date && isValidDateStr(date) ? date : todayStr();
-  await ensureSeeded();
+  // 先确保当日记录存在（若首次生成正在途中共用同一任务，避免并发竞态）
+  await ensureDaily(d);
   const existing = await db.dailyCard.findUnique({ where: { date: d } });
   const variant = (existing?.variant ?? 0) + 1;
   const showDate = existing?.showDate ?? true;
@@ -232,22 +228,28 @@ export async function listHistory(limit = 60): Promise<
     orderBy: { date: 'desc' },
     take: limit,
   });
-  const result = [];
-  for (const r of records) {
-    const [bg, quote] = await Promise.all([
-      r.backgroundId !== 'none'
-        ? db.background.findUnique({ where: { id: r.backgroundId }, select: { label: true } })
-        : null,
-      r.quoteId !== 'none' ? db.quote.findUnique({ where: { id: r.quoteId }, select: { content: true } }) : null,
-    ]);
-    result.push({
-      date: r.date,
-      variant: r.variant,
-      showDate: r.showDate,
-      updatedAt: r.updatedAt ? Math.floor(new Date(r.updatedAt).getTime() / 1000) : 0,
-      backgroundLabel: bg?.label || '自定义背景',
-      quoteExcerpt: (quote?.content ?? FALLBACK_CONTENT).replace(/[【】]|~~/g, '').replace(/\n/g, ' ').slice(0, 48),
-    });
-  }
-  return result;
+  // 批量取被引用素材（各 1 次查询），避免逐条 N+1 往返
+  const bgIds = [...new Set(records.filter((r) => r.backgroundId !== 'none').map((r) => r.backgroundId))];
+  const quoteIds = [...new Set(records.filter((r) => r.quoteId !== 'none').map((r) => r.quoteId))];
+  const [bgs, quotes] = await Promise.all([
+    bgIds.length
+      ? db.background.findMany({ where: { id: { in: bgIds } }, select: { id: true, label: true } })
+      : Promise.resolve([] as { id: string; label: string }[]),
+    quoteIds.length
+      ? db.quote.findMany({ where: { id: { in: quoteIds } }, select: { id: true, content: true } })
+      : Promise.resolve([] as { id: string; content: string }[]),
+  ]);
+  const bgLabels = new Map(bgs.map((b) => [b.id, b.label]));
+  const quoteContents = new Map(quotes.map((q) => [q.id, q.content]));
+  return records.map((r) => ({
+    date: r.date,
+    variant: r.variant,
+    showDate: r.showDate,
+    updatedAt: r.updatedAt ? Math.floor(new Date(r.updatedAt).getTime() / 1000) : 0,
+    backgroundLabel: bgLabels.get(r.backgroundId) || '自定义背景',
+    quoteExcerpt: (quoteContents.get(r.quoteId) ?? FALLBACK_CONTENT)
+      .replace(/[【】]|~~/g, '')
+      .replace(/\n/g, ' ')
+      .slice(0, 48),
+  }));
 }

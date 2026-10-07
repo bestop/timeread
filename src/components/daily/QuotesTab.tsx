@@ -198,11 +198,14 @@ export function QuotesTab() {
                 placeholder="Do not go gentle into that good night."
                 className="rounded-[2px] border-[var(--hairline)] bg-white/50 text-[16px] focus-visible:ring-[var(--ink-faint)]/40 sm:text-sm"
               />
+              {footnote.length > 0 && (
+                <p className="text-right text-xs text-[var(--ink-faint)]">{footnote.length} / 160</p>
+              )}
             </div>
             <button
               onClick={() => createQuote.mutate()}
               disabled={createQuote.isPending}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] text-sm tracking-[0.18em] text-[var(--paper)] transition-colors duration-300 hover:bg-[#3a362f] disabled:opacity-40"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] text-sm tracking-[0.18em] text-[var(--paper)] transition-all duration-300 hover:bg-[#3a362f] active:scale-[0.98] disabled:opacity-40"
             >
               {createQuote.isPending ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.6} /> : null}
               存入文字库
@@ -263,7 +266,7 @@ export function QuotesTab() {
                           onClick={() => pinQuote.mutate(it.id)}
                           disabled={pinQuote.isPending}
                           aria-label="选为今日日签文字"
-                          className="inline-flex h-8 items-center gap-1.5 rounded-[2px] px-2 text-[11px] tracking-[0.16em] text-[var(--ink-faint)] transition-colors duration-300 hover:bg-white/60 hover:text-[var(--ink)] disabled:opacity-40 sm:h-7"
+                          className="inline-flex h-8 items-center gap-1.5 rounded-[2px] px-2 text-[11px] tracking-[0.16em] text-[var(--ink-faint)] transition-all duration-300 hover:bg-white/60 hover:text-[var(--ink)] active:scale-[0.97] disabled:opacity-40 sm:h-7"
                         >
                           <CalendarCheck className="h-3.5 w-3.5" strokeWidth={1.6} />
                           选为今日
@@ -352,11 +355,14 @@ export function QuotesTab() {
                 placeholder="Do not go gentle into that good night."
                 className="rounded-[2px] border-[var(--hairline)] bg-white/50 text-[16px] focus-visible:ring-[var(--ink-faint)]/40 sm:text-sm"
               />
+              {editFootnote.length > 0 && (
+                <p className="text-right text-xs text-[var(--ink-faint)]">{editFootnote.length} / 160</p>
+              )}
             </div>
             <button
               onClick={() => updateQuote.mutate()}
               disabled={updateQuote.isPending || !editContent.trim() || editPlen > 500}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] text-sm tracking-[0.18em] text-[var(--paper)] transition-colors duration-300 hover:bg-[#3a362f] disabled:opacity-40"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] text-sm tracking-[0.18em] text-[var(--paper)] transition-all duration-300 hover:bg-[#3a362f] active:scale-[0.98] disabled:opacity-40"
             >
               {updateQuote.isPending ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.6} /> : null}
               保存修改

@@ -93,7 +93,7 @@ export function HistoryTab() {
       </div>
 
       <Dialog open={!!active} onOpenChange={(o) => !o && setActive(null)}>
-        <DialogContent className="max-w-md rounded-[2px] border-[var(--hairline)] bg-[var(--paper)] p-6">
+        <DialogContent className="max-w-[calc(100vw-2rem)] rounded-[2px] border-[var(--hairline)] bg-[var(--paper)] p-6 sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="font-serif-sc text-base tracking-[0.14em] text-[var(--ink)]">
               {active ? friendlyDate(active.date) : ''}
@@ -115,7 +115,7 @@ export function HistoryTab() {
                 <a
                   href={active.imageUrl}
                   download={`时光贴-${active.date}.jpg`}
-                  className="flex h-10 items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] px-6 text-sm tracking-[0.14em] text-[var(--paper)] transition-colors duration-300 hover:bg-[#3a362f]"
+                  className="flex h-10 items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] px-6 text-sm tracking-[0.14em] text-[var(--paper)] transition-all duration-300 hover:bg-[#3a362f] active:scale-[0.98]"
                 >
                   <Download className="h-4 w-4" strokeWidth={1.6} />
                   收藏此签

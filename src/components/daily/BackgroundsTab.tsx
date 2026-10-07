@@ -202,20 +202,24 @@ export function BackgroundsTab() {
         role="button"
         tabIndex={0}
         aria-label="上传背景图片"
-        onClick={() => inputRef.current?.click()}
+        onClick={() => {
+          if (!uploading) inputRef.current?.click();
+        }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click();
+          if ((e.key === 'Enter' || e.key === ' ') && !uploading) inputRef.current?.click();
         }}
         onDragOver={(e) => {
           e.preventDefault();
-          setDragOver(true);
+          if (!uploading) setDragOver(true);
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={(e) => {
           e.preventDefault();
           setDragOver(false);
+          if (uploading) return; // 上传进行中忽略新的投放，避免并发批次互相踩状态
           if (e.dataTransfer.files?.length) uploadFiles(e.dataTransfer.files);
         }}
+        aria-disabled={uploading}
         className={`mt-6 flex min-h-[148px] cursor-pointer flex-col items-center justify-center gap-2.5 border border-dashed p-6 text-center transition-all duration-300 sm:p-8 ${
           dragOver
             ? 'border-[var(--ink-soft)] bg-white/70'
@@ -331,7 +335,7 @@ export function BackgroundsTab() {
                     onClick={() => pinBg.mutate(it.id)}
                     disabled={pinBg.isPending}
                     aria-label={`将 ${it.label || '此背景'} 选为今日日签`}
-                    className="flex h-8 w-full items-center justify-center gap-1.5 border border-[var(--hairline)] bg-transparent text-[11px] tracking-[0.18em] text-[var(--ink-soft)] transition-colors duration-300 hover:border-[var(--ink-faint)] hover:bg-white/60 hover:text-[var(--ink)] disabled:opacity-40"
+                    className="flex h-8 w-full items-center justify-center gap-1.5 border border-[var(--hairline)] bg-transparent text-[11px] tracking-[0.18em] text-[var(--ink-soft)] transition-all duration-300 hover:border-[var(--ink-faint)] hover:bg-white/60 hover:text-[var(--ink)] active:scale-[0.98] disabled:opacity-40"
                   >
                     <CalendarCheck className="h-3.5 w-3.5" strokeWidth={1.6} />
                     选为今日

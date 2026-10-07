@@ -129,12 +129,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     if (plainLength(content) > 500) return json({ error: '正文过长（纯文字请控制在 500 字内）' }, 400);
     if (footnote && footnote.length > 160) return json({ error: '英文注脚过长' }, 400);
     const row = await db.quote.create({ data: { content, footnote } });
-    // 新文案进入素材池后，当日首卡重新随机
-    const rec = await db.dailyCard.findUnique({ where: { date: todayStr() } });
-    if (rec && rec.variant === 0) {
-      await db.dailyCard.update({ where: { date: todayStr() }, data: { image: null } }).catch(() => {});
-      await invalidateCardFor(todayStr());
-    }
+    // 新素材入池不改动今日卡片：当日选取已定，点「再取一签」或「选为今日」即可用上新素材
     return json({ item: row });
   }
 
@@ -175,13 +170,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
         rejected.push(`${file.name}（处理失败）`);
       }
     }
-    if (created.length > 0) {
-      const rec = await db.dailyCard.findUnique({ where: { date: todayStr() } });
-      if (rec && rec.variant === 0) {
-        await db.dailyCard.update({ where: { date: todayStr() }, data: { image: null } }).catch(() => {});
-        await invalidateCardFor(todayStr());
-      }
-    }
+    // 新素材入池不改动今日卡片（与新增文案同理，避免无谓的重合成）
     return json({ created, rejected });
   }
 
@@ -229,6 +218,14 @@ export async function POST(req: NextRequest, ctx: Ctx) {
         : await db.quote.count({ where: { id } });
     if (!exists) return json({ error: type === 'background' ? '背景不存在' : '文案不存在' }, 404);
     await ensureDaily(d); // 确保当日记录存在（首次访问当日先生成）
+    // 已是所选且图在 → 直接返回，免去同图重合成
+    const rec = await db.dailyCard.findUnique({
+      where: { date: d },
+      select: { backgroundId: true, quoteId: true, image: true },
+    });
+    const alreadyPicked = type === 'background' ? rec?.backgroundId === id : rec?.quoteId === id;
+    const hasImage = !!(rec?.image && Buffer.from(rec.image).length > 0);
+    if (alreadyPicked && hasImage) return json(await dailyPayload(d));
     await db.dailyCard.update({
       where: { date: d },
       data: type === 'background' ? { backgroundId: id, image: null } : { quoteId: id, image: null },
@@ -255,7 +252,9 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       select: { id: true, palette: true },
     }).catch(() => null);
     if (!row) return json({ error: '背景不存在' }, 404);
-    await invalidateCardFor(todayStr());
+    // 仅当今日日签正用这张背景时才需重合成（换色影响成图）
+    const rec = await db.dailyCard.findUnique({ where: { date: todayStr() }, select: { backgroundId: true } });
+    if (rec?.backgroundId === id) await invalidateCardFor(todayStr());
     return json({ ok: true, palette: row.palette });
   }
 
@@ -275,8 +274,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     }).catch(() => null);
     if (!row) return json({ error: '文案不存在' }, 404);
     // 今日日签正在使用该文案 → 置空图片触发重合成
-    const rec = await db.dailyCard.findUnique({ where: { date: todayStr() } });
-    if (rec && rec.quoteId === id) await invalidateCardFor(todayStr());
+    const rec = await db.dailyCard.findUnique({ where: { date: todayStr() }, select: { quoteId: true } });
+    if (rec?.quoteId === id) await invalidateCardFor(todayStr());
     return json({ item: row });
   }
 
@@ -294,7 +293,9 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
     const row = await db.quote.findUnique({ where: { id } });
     if (!row) return json({ error: '文案不存在' }, 404);
     await db.quote.delete({ where: { id } });
-    await invalidateCardFor(todayStr());
+    // 仅当今日日签正引用该文案时才需重合成（ensureDaily 会自动另择一文）
+    const rec = await db.dailyCard.findUnique({ where: { date: todayStr() }, select: { quoteId: true } });
+    if (rec?.quoteId === id) await invalidateCardFor(todayStr());
     return json({ ok: true });
   }
 
@@ -305,7 +306,9 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
     const row = await db.background.findUnique({ where: { id } });
     if (!row) return json({ error: '背景不存在' }, 404);
     await db.background.delete({ where: { id } });
-    await invalidateCardFor(todayStr());
+    // 仅当今日日签正引用该背景时才需重合成（ensureDaily 会自动另择一底）
+    const rec = await db.dailyCard.findUnique({ where: { date: todayStr() }, select: { backgroundId: true } });
+    if (rec?.backgroundId === id) await invalidateCardFor(todayStr());
     return json({ ok: true });
   }
 

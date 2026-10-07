@@ -119,7 +119,7 @@ export function TodayTab({ bgCount, quoteCount }: { bgCount: number; quoteCount:
             href={info?.imageUrl ?? '#'}
             download={`时光贴-${info?.date ?? ''}.jpg`}
             aria-disabled={!info}
-            className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] text-sm tracking-[0.14em] text-[var(--paper)] transition-colors duration-300 ${
+            className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] text-sm tracking-[0.14em] text-[var(--paper)] transition-all duration-300 active:scale-[0.98] ${
               info ? 'hover:bg-[#3a362f]' : 'pointer-events-none opacity-40'
             }`}
           >
@@ -129,7 +129,7 @@ export function TodayTab({ bgCount, quoteCount }: { bgCount: number; quoteCount:
           <button
             onClick={() => regenerate.mutate()}
             disabled={regenerate.isPending || !info}
-            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[2px] border border-[var(--hairline)] bg-transparent text-sm tracking-[0.14em] text-[var(--ink)] transition-colors duration-300 hover:border-[var(--ink-faint)] hover:bg-white/40 disabled:opacity-40"
+            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[2px] border border-[var(--hairline)] bg-transparent text-sm tracking-[0.14em] text-[var(--ink)] transition-all duration-300 hover:border-[var(--ink-faint)] hover:bg-white/40 active:scale-[0.98] disabled:opacity-40"
           >
             {regenerate.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.6} />

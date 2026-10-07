@@ -5,7 +5,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Download, RefreshCw, Loader2 } from 'lucide-react';
+import { Download, RefreshCw, Loader2, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { friendlyDate, chineseDate, numericDate } from '@/lib/date-utils';
 import { FormattedQuote } from './FormattedQuote';
@@ -20,6 +20,7 @@ interface DailyInfo {
   quoteId: string | null;
   quoteContent: string;
   quoteFootnote: string | null;
+  showDate: boolean;
   imageUrl: string;
 }
 
@@ -50,6 +51,25 @@ export function TodayTab({ bgCount, quoteCount }: { bgCount: number; quoteCount:
       toast.success('已为你换了一组新组合');
     },
     onError: () => toast.error('换一换失败，请重试'),
+  });
+
+  // 日期显隐：可选显示项（默认显示，去掉勾选后日签图不绘制日期角标）
+  const setVisibility = useMutation({
+    mutationFn: async (showDate: boolean) => {
+      const res = await fetch('/api/daily/date-visibility', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ showDate }),
+      });
+      if (!res.ok) throw new Error('设置失败');
+      return res.json() as Promise<DailyInfo>;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(['daily'], data);
+      setImgLoaded(false);
+      toast.success(data.showDate ? '已恢复图上日期' : '已隐藏图上日期');
+    },
+    onError: () => toast.error('设置失败，请重试'),
   });
 
   const paletteLabel =
@@ -117,6 +137,33 @@ export function TodayTab({ bgCount, quoteCount }: { bgCount: number; quoteCount:
               <RefreshCw className="h-4 w-4" strokeWidth={1.6} />
             )}
             再取一签
+          </button>
+        </div>
+        {/* 日期显隐：可选显示项（默认勾选显示） */}
+        <div className="mx-auto mt-5 flex w-full max-w-[420px] items-center justify-center">
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={info?.showDate ?? true}
+            disabled={setVisibility.isPending || !info}
+            onClick={() => setVisibility.mutate(!(info?.showDate ?? true))}
+            className="group flex items-center gap-2.5 rounded-[2px] px-1 py-1.5 transition-opacity duration-300 disabled:opacity-40"
+          >
+            <span
+              aria-hidden
+              className={`flex h-[17px] w-[17px] shrink-0 items-center justify-center border transition-colors duration-300 ${
+                info?.showDate ?? true
+                  ? 'border-[var(--ink)] bg-[var(--ink)]'
+                  : 'border-[var(--ink-faint)] bg-transparent group-hover:border-[var(--ink-soft)]'
+              }`}
+            >
+              {(info?.showDate ?? true) && (
+                <Check className="h-3 w-3 text-[var(--paper)]" strokeWidth={2.6} />
+              )}
+            </span>
+            <span className="font-serif-sc text-[13px] tracking-[0.22em] text-[var(--ink-soft)] transition-colors duration-300 group-hover:text-[var(--ink)]">
+              图片显示日期
+            </span>
           </button>
         </div>
       </div>

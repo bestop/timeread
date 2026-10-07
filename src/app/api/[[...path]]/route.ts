@@ -34,6 +34,11 @@ function sanitizeLabel(name: string): string {
   return base.slice(0, 24) || '自定义背景';
 }
 
+function cardImageUrl(info: { date: string; variant: number; showDate: boolean; updatedAt: number }): string {
+  // s=日期显隐，t=记录变更时间：任一变化即生成新 URL，天然避开浏览器缓存
+  return `/api/card-image?date=${info.date}&v=${info.variant}&s=${info.showDate ? 1 : 0}&t=${info.updatedAt}`;
+}
+
 async function dailyPayload(date?: string) {
   const info = await ensureDaily(date);
   return {
@@ -45,7 +50,8 @@ async function dailyPayload(date?: string) {
     quoteId: info.quoteId,
     quoteContent: info.quoteContent,
     quoteFootnote: info.quoteFootnote,
-    imageUrl: `/api/card-image?date=${info.date}&v=${info.variant}`,
+    showDate: info.showDate,
+    imageUrl: cardImageUrl(info),
   };
 }
 
@@ -96,12 +102,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   // 往期列表
   if (segs[0] === 'daily' && segs[1] === 'history') {
     const items = await listHistory(60);
-    return json({
-      items: items.map((it) => ({
-        ...it,
-        imageUrl: `/api/card-image?date=${it.date}&v=${it.variant}`,
-      })),
-    });
+    return json({ items: items.map((it) => ({ ...it, imageUrl: cardImageUrl(it) })) });
   }
 
   // 日签图片（首次访问自动生成并入库）
@@ -197,8 +198,22 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       quoteId: info.quoteId,
       quoteContent: info.quoteContent,
       quoteFootnote: info.quoteFootnote,
-      imageUrl: `/api/card-image?date=${info.date}&v=${info.variant}`,
+      showDate: info.showDate,
+      imageUrl: cardImageUrl(info),
     });
+  }
+
+  // 日期显隐切换：可选显示项（默认显示，去掉勾选后日签图不绘制日期角标）
+  if (segs[0] === 'daily' && segs[1] === 'date-visibility') {
+    const body = (await req.json().catch(() => ({}))) as { showDate?: boolean };
+    const showDate = body.showDate !== false; // 缺省视为显示
+    const d = todayStr();
+    const existing = await db.dailyCard.findUnique({ where: { date: d } });
+    if (!existing) {
+      await ensureDaily(d); // 先按继承偏好生成当日记录
+    }
+    await db.dailyCard.update({ where: { date: d }, data: { showDate, image: null } }).catch(() => {});
+    return json(await dailyPayload(d));
   }
 
   return json({ error: 'Not Found' }, 404);

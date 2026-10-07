@@ -34,6 +34,8 @@ model DailyCard {
   backgroundId String
   quoteId      String
   variant      Int      @default(0) // 手动"换一换"次数，参与随机种子
+  showDate     Boolean  @default(true) // 图片上是否绘制日期角标（可选显示项，默认显示）
   image        Bytes?   // 已合成日签 JPEG（置空则下次访问重生成）
   createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt // 供图片 URL 缓存失效（素材/显隐变化即刷新）
 }

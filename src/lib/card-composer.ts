@@ -12,7 +12,8 @@ export const CARD_H = 1440;
 
 const MARGIN_X = 88;
 const DATE_BASELINE = 136;
-const BODY_TOP = 268;
+const BODY_TOP = 268; // 有日期角标时正文起始线
+const BODY_TOP_DATELESS = 196; // 隐藏日期时正文起始线（上移补偿，保持构图均衡）
 const BODY_BOTTOM = 1318;
 const FOOTER_BASELINE = 1382;
 
@@ -181,9 +182,13 @@ function layoutParagraphs(
   return { lines: groups, totalH, lh };
 }
 
-export function layoutCard(paras: Segment[][], opts?: { baseFs?: number }): LayoutResult {
+export function layoutCard(
+  paras: Segment[][],
+  opts?: { baseFs?: number; bodyTop?: number },
+): LayoutResult {
+  const bodyTop = opts?.bodyTop ?? BODY_TOP;
   const maxW = CARD_W - MARGIN_X * 2;
-  const availH = BODY_BOTTOM - BODY_TOP;
+  const availH = BODY_BOTTOM - bodyTop;
   const sizes = opts?.baseFs ? [opts.baseFs, ...[58, 54, 50, 46, 42, 38].filter((s) => s < opts.baseFs!)] : [58, 54, 50, 46, 42, 38];
 
   let chosen = sizes[sizes.length - 1];
@@ -199,8 +204,8 @@ export function layoutCard(paras: Segment[][], opts?: { baseFs?: number }): Layo
     layout = l;
   }
   // 垂直居中（略微偏上，贴近参考图）；钳制底部不越界
-  const availTop = BODY_TOP + Math.max(0, Math.round((availH - layout.totalH) / 2.4));
-  const blockTop = Math.max(BODY_TOP, Math.min(availTop, BODY_BOTTOM - layout.totalH));
+  const availTop = bodyTop + Math.max(0, Math.round((availH - layout.totalH) / 2.4));
+  const blockTop = Math.max(bodyTop, Math.min(availTop, BODY_BOTTOM - layout.totalH));
 
   // 分配 x / top（仅在跨越段落边界时空加段距）
   const lines: RenderLine[] = [];
@@ -232,6 +237,7 @@ export interface CardTextOptions {
   content: string;      // 含标记正文
   footnote?: string | null;
   palette: Palette;
+  showDate?: boolean;   // 图片上是否绘制日期角标（可选显示项，默认显示）
 }
 
 function underlineRuns(line: RenderLine): { x: number; w: number }[] {
@@ -252,8 +258,10 @@ function underlineRuns(line: RenderLine): { x: number; w: number }[] {
 
 export function buildOverlaySvg(opts: CardTextOptions): Buffer {
   const { dateStr, content, footnote, palette } = opts;
+  const showDate = opts.showDate !== false; // 默认显示日期
+  const bodyTop = showDate ? BODY_TOP : BODY_TOP_DATELESS;
   const paras = parseContent(content);
-  const layout = layoutCard(paras);
+  const layout = layoutCard(paras, { bodyTop });
   const { text: tc, hlBg, hlText } = palette;
   const fs = layout.fontSize;
   const spacing = Math.round(fs * 0.1);
@@ -264,15 +272,17 @@ export function buildOverlaySvg(opts: CardTextOptions): Buffer {
   const washOp = palette.dark ? 0.1 : 0.06;
   els.push(`<rect x="0" y="0" width="${CARD_W}" height="${CARD_H}" fill="${washColor}" opacity="${washOp}"/>`);
 
-  // 日期角标（字形路径，不依赖环境字体）
-  const dp = datePartsLocal(dateStr);
-  const dateFs = 40;
-  els.push(textToPathGroup(serifBox, `(${dp})`, MARGIN_X, DATE_BASELINE, dateFs, { fill: tc }));
-  const cnDate = chineseDateLocal(dateStr);
-  const cnW = advancePx(serifBox, cnDate, dateFs, 6);
-  els.push(
-    textToPathGroup(serifBox, cnDate, CARD_W - MARGIN_X - Math.round(cnW - 6), DATE_BASELINE, dateFs, { fill: tc, letterSpacing: 6 }),
-  );
+  // 日期角标（字形路径，不依赖环境字体）——可选显示项：默认显示，去掉勾选则不绘制
+  if (showDate) {
+    const dp = datePartsLocal(dateStr);
+    const dateFs = 40;
+    els.push(textToPathGroup(serifBox, `(${dp})`, MARGIN_X, DATE_BASELINE, dateFs, { fill: tc }));
+    const cnDate = chineseDateLocal(dateStr);
+    const cnW = advancePx(serifBox, cnDate, dateFs, 6);
+    els.push(
+      textToPathGroup(serifBox, cnDate, CARD_W - MARGIN_X - Math.round(cnW - 6), DATE_BASELINE, dateFs, { fill: tc, letterSpacing: 6 }),
+    );
+  }
 
   // 正文：先画高亮块（垫底），再画下划线，最后画文字（逐字符精确定位）
   const rects: string[] = [];
@@ -359,6 +369,7 @@ export interface ComposeInput {
   content: string;
   footnote?: string | null;
   paletteKey: string; // 'auto' 或具体 key
+  showDate?: boolean; // 图片上是否绘制日期角标（默认显示）
 }
 
 export interface ComposeResult {
@@ -390,6 +401,7 @@ export async function composeCard(input: ComposeInput): Promise<ComposeResult> {
     content: input.content,
     footnote: input.footnote,
     palette,
+    showDate: input.showDate,
   });
 
   const buffer = await sharp(imgBuf)

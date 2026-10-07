@@ -63,10 +63,18 @@ const PG_STATEMENTS = [
     "backgroundId" TEXT NOT NULL,
     "quoteId" TEXT NOT NULL,
     "variant" INTEGER NOT NULL DEFAULT 0,
+    "showDate" BOOLEAN NOT NULL DEFAULT true,
     "image" BYTEA,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "DailyCard_date_key" ON "DailyCard"("date")`,
+];
+
+// 旧库升级（Postgres 幂等）：为已存在的 DailyCard 补列
+const PG_MIGRATIONS = [
+  `ALTER TABLE "DailyCard" ADD COLUMN IF NOT EXISTS "showDate" BOOLEAN NOT NULL DEFAULT true`,
+  `ALTER TABLE "DailyCard" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP`,
 ];
 
 const SQLITE_STATEMENTS = [
@@ -90,11 +98,26 @@ const SQLITE_STATEMENTS = [
     "backgroundId" TEXT NOT NULL,
     "quoteId" TEXT NOT NULL,
     "variant" INTEGER NOT NULL DEFAULT 0,
+    "showDate" BOOLEAN NOT NULL DEFAULT 1,
     "image" BLOB,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "DailyCard_date_key" ON "DailyCard"("date")`,
 ];
+
+// 旧库升级（SQLite）：按 PRAGMA 检查后补列
+async function migrateSqliteColumns(): Promise<void> {
+  const cols = (await db.$queryRawUnsafe<{ name: string }[]>(`PRAGMA table_info("DailyCard")`)).map(
+    (c) => c.name,
+  );
+  if (!cols.includes('showDate')) {
+    await db.$executeRawUnsafe(`ALTER TABLE "DailyCard" ADD COLUMN "showDate" BOOLEAN NOT NULL DEFAULT 1`);
+  }
+  if (!cols.includes('updatedAt')) {
+    await db.$executeRawUnsafe(`ALTER TABLE "DailyCard" ADD COLUMN "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`);
+  }
+}
 
 let schemaReady: Promise<void> | null = null
 
@@ -104,6 +127,13 @@ export function ensureSchema(): Promise<void> {
       const statements = IS_POSTGRES ? PG_STATEMENTS : SQLITE_STATEMENTS;
       for (const sql of statements) {
         await db.$executeRawUnsafe(sql);
+      }
+      if (IS_POSTGRES) {
+        for (const sql of PG_MIGRATIONS) {
+          await db.$executeRawUnsafe(sql).catch(() => {});
+        }
+      } else {
+        await migrateSqliteColumns();
       }
     })().catch((e) => {
       schemaReady = null // 失败允许重试

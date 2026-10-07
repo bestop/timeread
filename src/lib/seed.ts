@@ -5,7 +5,10 @@ import fs from 'fs';
 import path from 'path';
 import { db } from './db';
 
-export const STORAGE_DIR = path.join(process.cwd(), 'storage');
+// 存储目录：Vercel 等只读文件系统环境下使用 /tmp（冷启动自动重建种子数据）
+export const STORAGE_DIR =
+  process.env.STORAGE_DIR ||
+  (process.env.VERCEL ? '/tmp/timeread-storage' : path.join(process.cwd(), 'storage'));
 export const BG_DIR = path.join(STORAGE_DIR, 'bg');
 export const CARD_DIR = path.join(STORAGE_DIR, 'cards');
 const SEEDED_FLAG = path.join(STORAGE_DIR, '.seeded');

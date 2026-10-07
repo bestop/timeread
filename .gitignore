@@ -1,20 +1,11 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
 node_modules
 /.pnp
 .pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
 
 # next.js
 /.next/
+/.next-verify/
 /out/
 
 # production
@@ -24,31 +15,44 @@ node_modules
 .DS_Store
 *.pem
 
-# debug
+# debug & logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files（提供 .env.example 模板）
+.env
+.env.local
+.env.*.local
 
 # vercel
 .vercel
 
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-local-*
-.claude
-.z-ai-config
-*.log
-dev.log
-dev.out.log
-test
-prompt
 
-server.log
-# Skills directory
+# 运行时数据（种子数据会自动重建）
+/db/*.db
+/db/*.db-journal
+/storage/
+/upload/
+
+# 沙箱与本地开发产物
+/.zscripts/
+/.z-ai-config/
+/.claude/
 /skills/
+/examples/
+/mini-services/
+/tests/
+/scripts/*.jpg
+/scripts/*.png
+/worklog.md
+/agent-ctx/
+/Caddyfile
+/download/
+/prompt
+/test
+/local-*

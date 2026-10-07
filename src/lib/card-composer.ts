@@ -5,12 +5,10 @@ import * as fontkit from 'fontkit';
 import sharp from 'sharp';
 import { parseContent, type SegStyle, type Segment } from './text-parser';
 import { resolvePalette, type Palette } from './palettes';
+import { FONT_SERIF_PATH, FONT_KAI_PATH } from './fonts';
 
 export const CARD_W = 1080;
 export const CARD_H = 1440;
-
-const FONT_SERIF = '/usr/share/fonts/truetype/noto-serif-sc/NotoSerifSC-SemiBold.ttf';
-const FONT_KAI = '/usr/share/fonts/truetype/lxgw-wenkai/LXGWWenKai-Regular.ttf';
 
 const MARGIN_X = 88;
 const DATE_BASELINE = 136;
@@ -25,13 +23,60 @@ const ASCII_WORD = /[0-9A-Za-z@#&'"’‘._\-]+/;
 // ---------- 字体测量 ----------
 interface FontBox { font: fontkit.Font; upm: number }
 
-function loadFont(path: string): FontBox {
-  const font = (fontkit as unknown as { openSync: (p: string) => fontkit.Font }).openSync(path);
+function loadFont(fp: string): FontBox {
+  const font = (fontkit as unknown as { openSync: (p: string) => fontkit.Font }).openSync(fp);
   return { font, upm: (font as unknown as { unitsPerEm: number }).unitsPerEm };
 }
 
-const serifBox = loadFont(FONT_SERIF);
-const kaiBox = loadFont(FONT_KAI);
+const serifBox = loadFont(FONT_SERIF_PATH);
+const kaiBox = loadFont(FONT_KAI_PATH);
+
+interface GlyphRun {
+  glyphs: { path: { toSVG(): string } }[];
+  positions: { xAdvance: number; xOffset: number; yOffset: number }[];
+}
+
+/**
+ * 将文字转为字形路径（不依赖运行环境字体，云端渲染一致）。
+ * fontkit 排版 → 每个字形输出 <path d="...">（字体单位，y 轴向上，需 scale(s,-s) 翻转）。
+ */
+function textToPathGroup(
+  box: FontBox,
+  text: string,
+  x: number,
+  baselineY: number,
+  fs: number,
+  opts?: { letterSpacing?: number; fill?: string; opacity?: number },
+): string {
+  if (!text) return '';
+  const scale = fs / box.upm;
+  const run = (box.font as unknown as { layout: (t: string) => GlyphRun }).layout(text);
+  const ls = opts?.letterSpacing ?? 0;
+  let penPx = 0;
+  const parts: string[] = [];
+  for (let i = 0; i < run.glyphs.length; i++) {
+    const g = run.glyphs[i];
+    const pos = run.positions[i];
+    const gx = x + penPx + pos.xOffset * scale;
+    const gy = baselineY - pos.yOffset * scale;
+    let d = '';
+    try {
+      d = g.path.toSVG();
+    } catch {
+      d = '';
+    }
+    if (d) {
+      parts.push(
+        `<path transform="translate(${gx.toFixed(2)} ${gy.toFixed(2)}) scale(${scale.toFixed(6)} ${(-scale).toFixed(6)})" d="${d}"/>`,
+      );
+    }
+    penPx += pos.xAdvance * scale + ls;
+  }
+  if (!parts.length) return '';
+  const fillAttr = opts?.fill ? ` fill="${opts.fill}"` : '';
+  const opAttr = opts?.opacity != null ? ` fill-opacity="${opts.opacity}"` : '';
+  return `<g${fillAttr}${opAttr}>${parts.join('')}</g>`;
+}
 
  
 function advancePx(box: FontBox, text: string, fs: number, extra = 0): number {
@@ -40,10 +85,6 @@ function advancePx(box: FontBox, text: string, fs: number, extra = 0): number {
   const run = (box.font as any).layout(text) as { advanceWidth: number };
   const total = (run.advanceWidth / box.upm) * fs;
   return total + extra * text.length;
-}
-
-function escapeXml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // ---------- 排版 ----------
@@ -223,16 +264,14 @@ export function buildOverlaySvg(opts: CardTextOptions): Buffer {
   const washOp = palette.dark ? 0.1 : 0.06;
   els.push(`<rect x="0" y="0" width="${CARD_W}" height="${CARD_H}" fill="${washColor}" opacity="${washOp}"/>`);
 
-  // 日期角标
+  // 日期角标（字形路径，不依赖环境字体）
   const dp = datePartsLocal(dateStr);
   const dateFs = 40;
-  els.push(
-    `<text x="${MARGIN_X}" y="${DATE_BASELINE}" font-family="Noto Serif SC" font-weight="600" font-size="${dateFs}" fill="${tc}" xml:space="preserve">(${escapeXml(dp)})</text>`,
-  );
+  els.push(textToPathGroup(serifBox, `(${dp})`, MARGIN_X, DATE_BASELINE, dateFs, { fill: tc }));
   const cnDate = chineseDateLocal(dateStr);
   const cnW = advancePx(serifBox, cnDate, dateFs, 6);
   els.push(
-    `<text x="${CARD_W - MARGIN_X - Math.round(cnW - 6)}" y="${DATE_BASELINE}" font-family="Noto Serif SC" font-weight="600" font-size="${dateFs}" fill="${tc}" xml:space="preserve">${escapeXml(cnDate)}</text>`,
+    textToPathGroup(serifBox, cnDate, CARD_W - MARGIN_X - Math.round(cnW - 6), DATE_BASELINE, dateFs, { fill: tc, letterSpacing: 6 }),
   );
 
   // 正文：先画高亮块（垫底），再画下划线，最后画文字（逐字符精确定位）
@@ -247,9 +286,7 @@ export function buildOverlaySvg(opts: CardTextOptions): Buffer {
           `<rect x="${it.x - Math.round(fs * 0.12)}" y="${Math.round(baseline - fs * 0.76)}" width="${Math.round(it.w + fs * 0.1)}" height="${Math.round(fs * 0.92)}" rx="7" fill="${hlBg}"/>`,
         );
       }
-      texts.push(
-        `<text x="${it.x}" y="${baseline}" font-family="Noto Serif SC" font-weight="600" font-size="${fs}" fill="${it.style === 'highlight' ? hlText : tc}" xml:space="preserve">${escapeXml(it.text)}</text>`,
-      );
+      texts.push(textToPathGroup(serifBox, it.text, it.x, baseline, fs, { fill: it.style === 'highlight' ? hlText : tc }));
     }
     for (const r of underlineRuns(line)) {
       uls.push(
@@ -273,13 +310,9 @@ export function buildOverlaySvg(opts: CardTextOptions): Buffer {
       fn = fn + '…';
     }
     const fnColor = hexWithAlpha(tc, 0.72);
-    els.push(
-      `<text x="${MARGIN_X}" y="${FOOTER_BASELINE}" font-family="LXGW WenKai" font-size="${fnFs}" fill="${fnColor}" letter-spacing="1" xml:space="preserve">${escapeXml(fn)}</text>`,
-    );
+    els.push(textToPathGroup(kaiBox, fn, MARGIN_X, FOOTER_BASELINE, fnFs, { fill: fnColor, letterSpacing: 1 }));
   }
-  els.push(
-    `<text x="${CARD_W - MARGIN_X - 8}" y="${FOOTER_BASELINE + 6}" font-family="Noto Serif SC" font-weight="600" font-size="62" fill="${tc}" opacity="0.9" xml:space="preserve">&amp;</text>`,
-  );
+  els.push(textToPathGroup(serifBox, '&', CARD_W - MARGIN_X - 8, FOOTER_BASELINE + 6, 62, { fill: tc, opacity: 0.9 }));
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_W}" height="${CARD_H}" viewBox="0 0 ${CARD_W} ${CARD_H}">
 ${els.join('\n')}

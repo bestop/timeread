@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Trash2, Loader2 } from 'lucide-react';
+import { Trash2, Loader2, CalendarCheck, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { PALETTE_OPTIONS, PALETTES } from '@/lib/palettes';
 
@@ -33,6 +33,13 @@ interface BgItem {
   origin: string;
   palette: string;
   createdAt: string;
+}
+
+interface DailyInfoLite {
+  date: string;
+  backgroundId: string | null;
+  quoteId: string | null;
+  [key: string]: unknown;
 }
 
 /** 前端压缩：长边 ≤1920、JPEG 0.85（白底拍平透明通道），规避请求体限制并加快上传 */
@@ -82,6 +89,16 @@ export function BackgroundsTab() {
     },
   });
   const items = data?.items ?? null;
+
+  // 当日日签信息：用于「今日在用」标记
+  const { data: daily } = useQuery({
+    queryKey: ['daily'],
+    queryFn: async () => {
+      const res = await fetch('/api/daily', { cache: 'no-store' });
+      if (!res.ok) throw new Error('加载失败');
+      return res.json() as Promise<DailyInfoLite>;
+    },
+  });
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['backgrounds'] });
@@ -150,6 +167,24 @@ export function BackgroundsTab() {
       refresh();
     },
     onError: () => toast.error('删除失败'),
+  });
+
+  // 选为今日：指定该背景作为今日日签底图（当日有效，换一换恢复随机）
+  const pinBg = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch('/api/daily/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'background', id }),
+      });
+      if (!res.ok) throw new Error('设置失败');
+      return res.json() as Promise<DailyInfoLite>;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(['daily'], data);
+      toast.success('已选为今日之底');
+    },
+    onError: () => toast.error('设置失败，请重试'),
   });
 
   return (
@@ -286,6 +321,22 @@ export function BackgroundsTab() {
                 <p className="text-[11px] text-[var(--ink-faint)]">
                   文字配色 · {PALETTES[it.palette]?.label ?? '自动取色'}
                 </p>
+                {daily?.backgroundId === it.id ? (
+                  <p className="flex h-8 items-center justify-center gap-1.5 border border-[var(--hairline)] bg-white/60 text-[11px] tracking-[0.18em] text-[var(--accent)]">
+                    <Check className="h-3.5 w-3.5" strokeWidth={2.2} />
+                    今日在用
+                  </p>
+                ) : (
+                  <button
+                    onClick={() => pinBg.mutate(it.id)}
+                    disabled={pinBg.isPending}
+                    aria-label={`将 ${it.label || '此背景'} 选为今日日签`}
+                    className="flex h-8 w-full items-center justify-center gap-1.5 border border-[var(--hairline)] bg-transparent text-[11px] tracking-[0.18em] text-[var(--ink-soft)] transition-colors duration-300 hover:border-[var(--ink-faint)] hover:bg-white/60 hover:text-[var(--ink)] disabled:opacity-40"
+                  >
+                    <CalendarCheck className="h-3.5 w-3.5" strokeWidth={1.6} />
+                    选为今日
+                  </button>
+                )}
               </div>
             </div>
           ))}

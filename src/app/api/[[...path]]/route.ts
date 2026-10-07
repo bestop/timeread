@@ -216,6 +216,26 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     return json(await dailyPayload(d));
   }
 
+  // 选为今日：指定背景或文字作为今日日签内容（当日有效，换一换恢复随机）
+  if (segs[0] === 'daily' && segs[1] === 'select') {
+    const body = (await req.json().catch(() => ({}))) as { type?: string; id?: string };
+    const type = body.type;
+    const id = (body.id ?? '').trim();
+    if ((type !== 'background' && type !== 'quote') || !id) return json({ error: '参数错误' }, 400);
+    const d = todayStr();
+    const exists =
+      type === 'background'
+        ? await db.background.count({ where: { id } })
+        : await db.quote.count({ where: { id } });
+    if (!exists) return json({ error: type === 'background' ? '背景不存在' : '文案不存在' }, 404);
+    await ensureDaily(d); // 确保当日记录存在（首次访问当日先生成）
+    await db.dailyCard.update({
+      where: { date: d },
+      data: type === 'background' ? { backgroundId: id, image: null } : { quoteId: id, image: null },
+    });
+    return json(await dailyPayload(d));
+  }
+
   return json({ error: 'Not Found' }, 404);
 }
 
@@ -237,6 +257,27 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     if (!row) return json({ error: '背景不存在' }, 404);
     await invalidateCardFor(todayStr());
     return json({ ok: true, palette: row.palette });
+  }
+
+  // 编辑文字素材（正文 / 英文注脚）
+  if (segs[0] === 'quotes' && segs.length === 2) {
+    await ensureSeeded();
+    const id = segs[1];
+    const body = (await req.json().catch(() => ({}))) as { content?: string; footnote?: string };
+    const content = (body.content ?? '').trim();
+    const footnote = (body.footnote ?? '').trim() || null;
+    if (!content) return json({ error: '正文不能为空' }, 400);
+    if (plainLength(content) > 500) return json({ error: '正文过长（纯文字请控制在 500 字内）' }, 400);
+    if (footnote && footnote.length > 160) return json({ error: '英文注脚过长' }, 400);
+    const row = await db.quote.update({
+      where: { id },
+      data: { content, footnote },
+    }).catch(() => null);
+    if (!row) return json({ error: '文案不存在' }, 404);
+    // 今日日签正在使用该文案 → 置空图片触发重合成
+    const rec = await db.dailyCard.findUnique({ where: { date: todayStr() } });
+    if (rec && rec.quoteId === id) await invalidateCardFor(todayStr());
+    return json({ item: row });
   }
 
   return json({ error: 'Not Found' }, 404);

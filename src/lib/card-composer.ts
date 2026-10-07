@@ -305,7 +305,7 @@ export function buildOverlaySvg(opts: CardTextOptions): Buffer {
     }
   }
 
-  // 底部：英文注脚（文楷）+ 装饰 &
+  // 底部：英文注脚（文楷）+ 装饰 &（仅在确有英文注脚时出现，无英文则留白）
   if (footnote && footnote.trim()) {
     let fnFs = 31;
     let fn = footnote.trim();
@@ -321,8 +321,8 @@ export function buildOverlaySvg(opts: CardTextOptions): Buffer {
     }
     const fnColor = hexWithAlpha(tc, 0.72);
     els.push(textToPathGroup(kaiBox, fn, MARGIN_X, FOOTER_BASELINE, fnFs, { fill: fnColor, letterSpacing: 1 }));
+    els.push(textToPathGroup(serifBox, '&', CARD_W - MARGIN_X - 8, FOOTER_BASELINE + 6, 62, { fill: tc, opacity: 0.9 }));
   }
-  els.push(textToPathGroup(serifBox, '&', CARD_W - MARGIN_X - 8, FOOTER_BASELINE + 6, 62, { fill: tc, opacity: 0.9 }));
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_W}" height="${CARD_H}" viewBox="0 0 ${CARD_W} ${CARD_H}">
 ${els.join('\n')}

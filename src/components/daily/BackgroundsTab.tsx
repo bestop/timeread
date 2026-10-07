@@ -1,6 +1,6 @@
 'use client';
 
-// 背景素材库：拖拽/点击上传、网格管理、配色方案、删除
+// 背景素材库：拖拽/点击上传（前端压缩、逐张提交）、网格管理、配色方案、删除
 import { useRef, useState } from 'react';
 import Image from 'next/image';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CloudUpload, Trash2, Loader2 } from 'lucide-react';
+import { Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PALETTE_OPTIONS, PALETTES } from '@/lib/palettes';
 
@@ -35,9 +35,40 @@ interface BgItem {
   createdAt: string;
 }
 
+/** 前端压缩：长边 ≤1920、JPEG 0.85（白底拍平透明通道），规避请求体限制并加快上传 */
+async function compressImage(file: File): Promise<Blob> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const MAX = 1920;
+    const scale = Math.min(1, MAX / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close?.();
+    return await new Promise<Blob>((resolve) => {
+      canvas.toBlob(
+        (b) => resolve(b && b.size < file.size ? b : file),
+        'image/jpeg',
+        0.85,
+      );
+    });
+  } catch {
+    return file;
+  }
+}
+
 export function BackgroundsTab() {
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
+  const [uploadTotal, setUploadTotal] = useState(0);
+  const [uploadDone, setUploadDone] = useState(0);
   const [dragOver, setDragOver] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -58,26 +89,37 @@ export function BackgroundsTab() {
   };
 
   const uploadFiles = async (files: FileList | File[]) => {
-    const list = Array.from(files);
+    const list = Array.from(files).filter((f) => f.size > 0);
     if (list.length === 0) return;
     setUploading(true);
+    setUploadTotal(list.length);
+    setUploadDone(0);
+    const created: string[] = [];
+    const rejected: string[] = [];
     try {
-      const form = new FormData();
-      for (const f of list) form.append('files', f);
-      const res = await fetch('/api/backgrounds', { method: 'POST', body: form });
-      const resData = await res.json();
-      if (!res.ok) throw new Error(resData.error || '上传失败');
-      if (resData.created?.length) {
-        toast.success(`已添加 ${resData.created.length} 张背景`);
+      for (let i = 0; i < list.length; i++) {
+        const f = list[i];
+        try {
+          const blob = await compressImage(f);
+          const form = new FormData();
+          form.append('files', blob, f.name);
+          const res = await fetch('/api/backgrounds', { method: 'POST', body: form });
+          const resData = await res.json();
+          if (!res.ok) throw new Error(resData.error || '上传失败');
+          if (resData.created?.length) created.push(resData.created[0].label);
+          if (resData.rejected?.length) rejected.push(...resData.rejected);
+        } catch {
+          rejected.push(f.name);
+        }
+        setUploadDone(i + 1);
       }
-      if (resData.rejected?.length) {
-        toast.warning(`部分文件未通过：${resData.rejected.join('、')}`);
-      }
+      if (created.length) toast.success(`已添 ${created.length} 张背景入册`);
+      if (rejected.length) toast.warning(`部分未收下：${rejected.join('、')}`);
       refresh();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '上传失败');
     } finally {
       setUploading(false);
+      setUploadTotal(0);
+      setUploadDone(0);
       if (inputRef.current) inputRef.current.value = '';
     }
   };
@@ -92,7 +134,7 @@ export function BackgroundsTab() {
       if (!res.ok) throw new Error('配色更新失败');
     },
     onSuccess: () => {
-      toast.success('配色已更新，今日日签将应用新配色');
+      toast.success('配色已更，今日之签将随新色');
       refresh();
     },
     onError: () => toast.error('配色更新失败'),
@@ -104,7 +146,7 @@ export function BackgroundsTab() {
       if (!res.ok) throw new Error('删除失败');
     },
     onSuccess: () => {
-      toast.success('背景已删除');
+      toast.success('已移出背景库');
       refresh();
     },
     onError: () => toast.error('删除失败'),
@@ -112,6 +154,14 @@ export function BackgroundsTab() {
 
   return (
     <div>
+      <p className="eyebrow">Backgrounds · 背景库</p>
+      <h2 className="font-serif-sc mt-2 text-2xl font-semibold tracking-wide text-[var(--ink)]">
+        一图一境
+      </h2>
+      <p className="mt-2 text-[13px] leading-relaxed text-[var(--ink-faint)]">
+        收进来的每一张图，都会成为未来某一天日签的底色。
+      </p>
+
       {/* 上传区 */}
       <div
         role="button"
@@ -131,21 +181,27 @@ export function BackgroundsTab() {
           setDragOver(false);
           if (e.dataTransfer.files?.length) uploadFiles(e.dataTransfer.files);
         }}
-        className={`flex min-h-[140px] cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed p-6 text-center transition-colors ${
+        className={`mt-6 flex min-h-[148px] cursor-pointer flex-col items-center justify-center gap-2.5 border border-dashed p-8 text-center transition-all duration-300 ${
           dragOver
-            ? 'border-[#2c2a26] bg-[#ece9df]'
-            : 'border-[#cfc9ba] bg-white/50 hover:border-[#a9a291] hover:bg-white/70'
+            ? 'border-[var(--ink-soft)] bg-white/70'
+            : 'border-[var(--hairline)] bg-white/35 hover:border-[var(--ink-faint)] hover:bg-white/55'
         }`}
       >
         {uploading ? (
-          <Loader2 className="h-6 w-6 animate-spin text-[#6f6a60]" />
+          <>
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--ink-soft)]" strokeWidth={1.5} />
+            <p className="font-serif-sc text-sm tracking-[0.18em] text-[var(--ink-soft)]">
+              正在收入 {uploadDone} / {uploadTotal}
+            </p>
+          </>
         ) : (
-          <CloudUpload className="h-6 w-6 text-[#6f6a60]" />
+          <>
+            <p className="font-serif-sc text-[15px] tracking-[0.22em] text-[var(--ink-soft)]">
+              将图片轻轻放入此处
+            </p>
+            <p className="eyebrow">Drop Images · JPG / PNG / WebP</p>
+          </>
         )}
-        <p className="text-sm text-[#4a463c]">
-          {uploading ? '正在处理…' : '拖拽图片到这里，或点击选择文件（支持多张，JPG / PNG / WebP）'}
-        </p>
-        <p className="text-xs text-[#9a9384]">上传后会自动作为日签背景参与每日组合</p>
         <input
           ref={inputRef}
           type="file"
@@ -160,43 +216,46 @@ export function BackgroundsTab() {
 
       {/* 网格 */}
       {isLoading || items === null ? (
-        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="mt-8 grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="aspect-[3/4] rounded-md" />
+            <Skeleton key={i} className="aspect-[3/4] rounded-[2px]" />
           ))}
         </div>
       ) : items.length === 0 ? (
-        <p className="mt-10 text-center text-sm text-[#9a9384]">背景库还是空的，先上传几张吧。</p>
+        <p className="mt-12 text-center font-serif-sc text-sm tracking-[0.2em] text-[var(--ink-faint)]">
+          背景库还空着，等第一张图。
+        </p>
       ) : (
-        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="mt-8 grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4">
           {items.map((it) => (
             <div
               key={it.id}
-              className="group overflow-hidden rounded-md border border-[#e3ded2] bg-white/60"
+              className="lift group overflow-hidden rounded-[2px] border border-[var(--hairline)] bg-white/45"
             >
-              <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#eceae4]">
+              <div className="relative aspect-[3/4] w-full overflow-hidden bg-[var(--paper-deep)]">
                 <Image
                   src={`/api/backgrounds/${it.id}/image`}
                   alt={it.label || '背景'}
                   fill
                   sizes="(max-width: 640px) 45vw, (max-width: 1024px) 30vw, 22vw"
-                  className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                  className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                   unoptimized
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
               </div>
-              <div className="space-y-2 p-3">
+              <div className="space-y-2.5 p-3.5">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="min-w-0 flex-1 truncate text-sm text-[#3a372f]" title={it.label}>
+                  <p className="min-w-0 flex-1 truncate font-serif-sc text-[13px] tracking-wide text-[#33302a]" title={it.label}>
                     {it.label || '未命名'}
                   </p>
                   <Button
                     variant="ghost"
                     size="icon"
                     aria-label={`删除 ${it.label}`}
-                    className="h-8 w-8 shrink-0 text-[#9a9384] hover:bg-[#f3e9e4] hover:text-[#b4543a]"
+                    className="h-7 w-7 shrink-0 text-[var(--ink-faint)] hover:bg-[#f3e9e4] hover:text-[#a8503a]"
                     onClick={() => setDeleteId(it.id)}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-3.5 w-3.5" strokeWidth={1.6} />
                   </Button>
                 </div>
                 <Select
@@ -205,7 +264,7 @@ export function BackgroundsTab() {
                 >
                   <SelectTrigger
                     size="sm"
-                    className="h-8 w-full border-[#ddd7c8] bg-white/70 text-xs text-[#4a463c]"
+                    className="h-8 w-full border-[var(--hairline)] bg-white/60 text-xs text-[var(--ink-soft)]"
                   >
                     <SelectValue placeholder="配色" />
                   </SelectTrigger>
@@ -224,7 +283,7 @@ export function BackgroundsTab() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-[11px] text-[#9a9384]">
+                <p className="text-[11px] text-[var(--ink-faint)]">
                   文字配色 · {PALETTES[it.palette]?.label ?? '自动取色'}
                 </p>
               </div>
@@ -234,23 +293,23 @@ export function BackgroundsTab() {
       )}
 
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="border-[var(--hairline)] bg-[var(--paper)] rounded-[2px]">
           <AlertDialogHeader>
-            <AlertDialogTitle>删除这张背景？</AlertDialogTitle>
+            <AlertDialogTitle className="font-serif-sc tracking-wide">收走这张背景？</AlertDialogTitle>
             <AlertDialogDescription>
-              删除后不可恢复。若今日日签正在使用它，系统会自动重新选图。
+              移出后不可恢复。若今日日签正在用它，会自动另择一底。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-[2px]">留下</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-[#b4543a] text-white hover:bg-[#9c452e]"
+              className="rounded-[2px] bg-[#a8503a] text-white hover:bg-[#8f4330]"
               onClick={() => {
                 if (deleteId) removeBg.mutate(deleteId);
                 setDeleteId(null);
               }}
             >
-              删除
+              收走
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,8 +1,6 @@
-// 每日日签服务：确定性选取 + 生成 + 缓存
-import fs from 'fs';
-import path from 'path';
+// 每日日签服务：确定性选取 + 生成 + 入库缓存（日签图本体存于数据库）
 import { db } from './db';
-import { CARD_DIR, BG_DIR, ensureDirs, ensureSeeded, mulberry32, hashStr } from './seed';
+import { ensureSeeded, mulberry32, hashStr } from './seed';
 import { composeCard } from './card-composer';
 import { todayStr, isValidDateStr } from './date-utils';
 
@@ -17,41 +15,15 @@ export interface DailyInfo {
   quoteId: string | null;
   quoteContent: string;
   quoteFootnote: string | null;
-  imagePath: string;
-}
-
-function cardFilePath(date: string, variant: number): string {
-  return path.join(CARD_DIR, `${date}_v${variant}.jpg`);
-}
-
-function removeCardFiles(date: string, keep?: string) {
-  ensureDirs();
-  if (!fs.existsSync(CARD_DIR)) return;
-  for (const f of fs.readdirSync(CARD_DIR)) {
-    if (f.startsWith(`${date}_v`) && f !== keep) {
-      try {
-        fs.unlinkSync(path.join(CARD_DIR, f));
-      } catch {
-        /* ignore */
-      }
-    }
-  }
+  image: Buffer; // 已合成日签 JPEG
 }
 
 /** 按 (date, variant) 确定性挑选素材并合成 */
-async function pickAndCompose(date: string, variant: number): Promise<{
-  buffer: Buffer;
-  backgroundId: string | null;
-  backgroundLabel: string;
-  backgroundPalette: string;
-  quoteId: string | null;
-  quoteContent: string;
-  quoteFootnote: string | null;
-}> {
+async function pickAndCompose(date: string, variant: number): Promise<DailyInfo> {
   const [bgs, quotes] = await Promise.all([
     db.background.findMany({
       orderBy: { createdAt: 'asc' },
-      select: { id: true, filename: true, label: true, palette: true },
+      select: { id: true, label: true, palette: true },
     }),
     db.quote.findMany({
       orderBy: { createdAt: 'asc' },
@@ -63,9 +35,15 @@ async function pickAndCompose(date: string, variant: number): Promise<{
   const bg = bgs.length ? bgs[Math.floor(rnd() * bgs.length) % bgs.length] : null;
   const quote = quotes.length ? quotes[Math.floor(rnd() * 10007) % quotes.length] : null;
 
-  const bgPath = bg ? path.join(BG_DIR, bg.filename) : null;
+  // 仅按需取选中背景的二进制
+  let bgData: Buffer | null = null;
+  if (bg) {
+    const row = await db.background.findUnique({ where: { id: bg.id }, select: { data: true } });
+    bgData = row?.data ? Buffer.from(row.data) : null;
+  }
+
   const { buffer } = await composeCard({
-    backgroundPath: bgPath && fs.existsSync(bgPath) ? bgPath : null,
+    backgroundBuffer: bgData,
     dateStr: date,
     content: quote?.content ?? FALLBACK_CONTENT,
     footnote: quote?.footnote ?? null,
@@ -73,19 +51,21 @@ async function pickAndCompose(date: string, variant: number): Promise<{
   });
 
   return {
-    buffer,
+    date,
+    variant,
     backgroundId: bg?.id ?? null,
     backgroundLabel: bg?.label || (bg ? '自定义背景' : '素色底纹'),
     backgroundPalette: bg?.palette ?? 'auto',
     quoteId: quote?.id ?? null,
     quoteContent: quote?.content ?? FALLBACK_CONTENT,
     quoteFootnote: quote?.footnote ?? null,
+    image: buffer,
   };
 }
 
 const inflight = new Map<string, Promise<DailyInfo>>();
 
-/** 确保某天的日签存在（首次访问自动生成），返回其信息 */
+/** 确保某天的日签存在（首次访问自动生成并入库），返回其信息 */
 export async function ensureDaily(date?: string): Promise<DailyInfo> {
   const d = date && isValidDateStr(date) ? date : todayStr();
   const running = inflight.get(d);
@@ -93,98 +73,89 @@ export async function ensureDaily(date?: string): Promise<DailyInfo> {
 
   const task = (async (): Promise<DailyInfo> => {
     await ensureSeeded();
-    ensureDirs();
 
     let record = await db.dailyCard.findUnique({ where: { date: d } });
 
     if (!record) {
       const picked = await pickAndCompose(d, 0);
-      const fp = cardFilePath(d, 0);
-      fs.writeFileSync(fp, picked.buffer);
-      record = await db.dailyCard.create({
+      await db.dailyCard.create({
         data: {
           date: d,
           backgroundId: picked.backgroundId ?? 'none',
           quoteId: picked.quoteId ?? 'none',
           variant: 0,
+          image: picked.image,
         },
       });
-      return {
-        date: d,
-        variant: 0,
-        backgroundId: picked.backgroundId,
-        backgroundLabel: picked.backgroundLabel,
-        backgroundPalette: picked.backgroundPalette,
-        quoteId: picked.quoteId,
-        quoteContent: picked.quoteContent,
-        quoteFootnote: picked.quoteFootnote,
-        imagePath: fp,
-      };
+      return picked;
     }
 
     // 记录存在：校验素材仍可用
-    let needRecompose = false;
-    let variant = record.variant;
     const bgExists = record.backgroundId === 'none' ? true : await db.background.count({ where: { id: record.backgroundId } }) > 0;
     const quoteExists = record.quoteId === 'none' ? true : await db.quote.count({ where: { id: record.quoteId } }) > 0;
 
-    let bg: { id: string; filename: string; label: string; palette: string } | null = null;
+    let bg: { id: string; label: string; palette: string } | null = null;
     let quote: { id: string; content: string; footnote: string | null } | null = null;
     if (record.backgroundId !== 'none') {
-      const found = await db.background.findUnique({ where: { id: record.backgroundId } });
-      bg = found ? { id: found.id, filename: found.filename, label: found.label, palette: found.palette } : null;
+      const found = await db.background.findUnique({ where: { id: record.backgroundId }, select: { id: true, label: true, palette: true } });
+      bg = found;
     }
     if (record.quoteId !== 'none') {
-      const found = await db.quote.findUnique({ where: { id: record.quoteId } });
-      quote = found ? { id: found.id, content: found.content, footnote: found.footnote } : null;
-    }
-    if ((record.backgroundId !== 'none' && !bgExists) || (record.quoteId !== 'none' && !quoteExists)) {
-      // 素材被删除 → 重新挑选
-      removeCardFiles(d);
-      const picked = await pickAndCompose(d, variant);
-      const fp = cardFilePath(d, variant);
-      fs.writeFileSync(fp, picked.buffer);
-      await db.dailyCard.update({
-        where: { date: d },
-        data: { backgroundId: picked.backgroundId ?? 'none', quoteId: picked.quoteId ?? 'none' },
-      });
-      return {
-        date: d,
-        variant,
-        backgroundId: picked.backgroundId,
-        backgroundLabel: picked.backgroundLabel,
-        backgroundPalette: picked.backgroundPalette,
-        quoteId: picked.quoteId,
-        quoteContent: picked.quoteContent,
-        quoteFootnote: picked.quoteFootnote,
-        imagePath: fp,
-      };
+      const found = await db.quote.findUnique({ where: { id: record.quoteId }, select: { id: true, content: true, footnote: true } });
+      quote = found;
     }
 
-    const fp = cardFilePath(d, variant);
-    if (!fs.existsSync(fp)) needRecompose = true;
-    if (needRecompose) {
-      const bgPath = bg ? path.join(BG_DIR, bg.filename) : null;
+    if ((record.backgroundId !== 'none' && !bgExists) || (record.quoteId !== 'none' && !quoteExists)) {
+      // 素材被删除 → 重新挑选并覆盖入库
+      const picked = await pickAndCompose(d, record.variant);
+      await db.dailyCard.update({
+        where: { date: d },
+        data: {
+          backgroundId: picked.backgroundId ?? 'none',
+          quoteId: picked.quoteId ?? 'none',
+          image: picked.image,
+        },
+      });
+      return picked;
+    }
+
+    const hasImage = record.image && Buffer.from(record.image).length > 0;
+    if (!hasImage) {
+      // 图片缺失（素材改动置空 / 旧数据迁移）→ 重生成
+      const bgData = bg
+        ? await db.background.findUnique({ where: { id: bg.id }, select: { data: true } }).then((r) => (r?.data ? Buffer.from(r.data) : null))
+        : null;
       const { buffer } = await composeCard({
-        backgroundPath: bgPath && fs.existsSync(bgPath) ? bgPath : null,
+        backgroundBuffer: bgData,
         dateStr: d,
         content: quote?.content ?? FALLBACK_CONTENT,
         footnote: quote?.footnote ?? null,
         paletteKey: bg?.palette ?? 'auto',
       });
-      fs.writeFileSync(fp, buffer);
+      await db.dailyCard.update({ where: { date: d }, data: { image: buffer } });
+      return {
+        date: d,
+        variant: record.variant,
+        backgroundId: bg?.id ?? null,
+        backgroundLabel: bg?.label || (bg ? '自定义背景' : '素色底纹'),
+        backgroundPalette: bg?.palette ?? 'auto',
+        quoteId: quote?.id ?? null,
+        quoteContent: quote?.content ?? FALLBACK_CONTENT,
+        quoteFootnote: quote?.footnote ?? null,
+        image: buffer,
+      };
     }
 
     return {
       date: d,
-      variant,
+      variant: record.variant,
       backgroundId: bg?.id ?? null,
       backgroundLabel: bg?.label || (bg ? '自定义背景' : '素色底纹'),
       backgroundPalette: bg?.palette ?? 'auto',
       quoteId: quote?.id ?? null,
       quoteContent: quote?.content ?? FALLBACK_CONTENT,
       quoteFootnote: quote?.footnote ?? null,
-      imagePath: fp,
+      image: Buffer.from(record.image),
     };
   })();
 
@@ -200,39 +171,36 @@ export async function ensureDaily(date?: string): Promise<DailyInfo> {
 export async function regenerateDaily(date?: string): Promise<DailyInfo> {
   const d = date && isValidDateStr(date) ? date : todayStr();
   await ensureSeeded();
-  ensureDirs();
   const existing = await db.dailyCard.findUnique({ where: { date: d } });
   const variant = (existing?.variant ?? 0) + 1;
   const picked = await pickAndCompose(d, variant);
-  removeCardFiles(d, `${d}_v${variant}.jpg`);
-  const fp = cardFilePath(d, variant);
-  fs.writeFileSync(fp, picked.buffer);
   if (existing) {
     await db.dailyCard.update({
       where: { date: d },
-      data: { variant, backgroundId: picked.backgroundId ?? 'none', quoteId: picked.quoteId ?? 'none' },
+      data: {
+        variant,
+        backgroundId: picked.backgroundId ?? 'none',
+        quoteId: picked.quoteId ?? 'none',
+        image: picked.image,
+      },
     });
   } else {
     await db.dailyCard.create({
-      data: { date: d, variant, backgroundId: picked.backgroundId ?? 'none', quoteId: picked.quoteId ?? 'none' },
+      data: {
+        date: d,
+        variant,
+        backgroundId: picked.backgroundId ?? 'none',
+        quoteId: picked.quoteId ?? 'none',
+        image: picked.image,
+      },
     });
   }
-  return {
-    date: d,
-    variant,
-    backgroundId: picked.backgroundId,
-    backgroundLabel: picked.backgroundLabel,
-    backgroundPalette: picked.backgroundPalette,
-    quoteId: picked.quoteId,
-    quoteContent: picked.quoteContent,
-    quoteFootnote: picked.quoteFootnote,
-    imagePath: fp,
-  };
+  return picked;
 }
 
-/** 素材库变动后：若当日卡片引用了被改动的素材则使其重生成 */
+/** 素材库变动后：若当日卡片引用了被改动的素材则使其重生成（置空图片） */
 export async function invalidateCardFor(date: string) {
-  removeCardFiles(date);
+  await db.dailyCard.updateMany({ where: { date }, data: { image: null } }).catch(() => {});
 }
 
 /** 往期列表 */

@@ -1,16 +1,13 @@
 'use client';
 
-// 今日日签：卡片展示 + 下载 + 换一换 + 当日信息
+// 今日日签：展墙式卡片呈现 + 下载 + 换一换 + 编辑部信息栏
 import { useState } from 'react';
 import Image from 'next/image';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Download, RefreshCw, Feather, ImageIcon, Loader2 } from 'lucide-react';
+import { Download, RefreshCw, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { friendlyDate, chineseDate } from '@/lib/date-utils';
+import { friendlyDate, chineseDate, numericDate } from '@/lib/date-utils';
 import { FormattedQuote } from './FormattedQuote';
 import { PALETTES } from '@/lib/palettes';
 
@@ -61,116 +58,144 @@ export function TodayTab({ bgCount, quoteCount }: { bgCount: number; quoteCount:
       : '自动取色';
 
   return (
-    <div className="grid gap-10 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,440px)_minmax(0,1fr)] items-start">
-      {/* 卡片区 */}
+    <div className="grid items-start gap-12 lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)] xl:gap-16">
+      {/* 卡片区：留白装裱 + 竖排标注 */}
       <div>
-        <div className="relative mx-auto aspect-[3/4] w-full max-w-[440px] overflow-hidden rounded-sm bg-[#EDEAE2] card-shadow">
-          {isLoading || !info ? (
-            <Skeleton className="h-full w-full rounded-none" />
-          ) : (
-            <>
-              {!imgLoaded && <Skeleton className="absolute inset-0 h-full w-full rounded-none" />}
-              <Image
-                src={info.imageUrl}
-                alt={`日签 ${friendlyDate(info.date)}`}
-                fill
-                sizes="(max-width: 1024px) 90vw, 440px"
-                className="object-cover"
-                priority
-                unoptimized
-                onLoad={() => setImgLoaded(true)}
-                onError={() => setImgLoaded(true)}
-              />
-            </>
-          )}
-        </div>
-        <div className="mx-auto mt-5 flex w-full max-w-[440px] gap-3">
-          <Button
-            asChild
-            className="flex-1 bg-[#2c2a26] text-[#f6f4ee] hover:bg-[#443f37]"
-            disabled={!info}
+        <div className="mat-frame relative mx-auto w-full max-w-[420px]">
+          <div className="relative aspect-[3/4] w-full overflow-hidden rounded-[2px] bg-[var(--paper-deep)] card-shadow">
+            {isLoading || !info ? (
+              <Skeleton className="h-full w-full rounded-none" />
+            ) : (
+              <>
+                {!imgLoaded && <Skeleton className="absolute inset-0 h-full w-full rounded-none" />}
+                <Image
+                  src={info.imageUrl}
+                  alt={`日签 ${friendlyDate(info.date)}`}
+                  fill
+                  sizes="(max-width: 1024px) 90vw, 430px"
+                  className="object-cover"
+                  priority
+                  unoptimized
+                  onLoad={() => setImgLoaded(true)}
+                  onError={() => setImgLoaded(true)}
+                />
+              </>
+            )}
+          </div>
+          {/* 竖排标注（桌面端，锚定卡片外右上） */}
+          <div
+            className="absolute -right-8 top-1 hidden select-none flex-col items-center gap-4 lg:flex"
+            aria-hidden
           >
-            <a href={info?.imageUrl ?? '#'} download={`日签-${info?.date ?? ''}.jpg`}>
-              <Download className="h-4 w-4" />
-              保存图片
-            </a>
-          </Button>
-          <Button
-            variant="outline"
-            className="flex-1 border-[#c9c3b4] bg-transparent text-[#2c2a26] hover:bg-[#ece9df] hover:text-[#2c2a26]"
+            <span className="v-text font-serif-sc text-[13px] text-[var(--ink-soft)]">今日日签</span>
+            <span className="h-10 w-px bg-[var(--hairline)]" />
+            <span className="v-text text-[10px] tracking-[0.3em] text-[var(--ink-faint)]">
+              {info ? chineseDate(info.date) : ''}
+            </span>
+          </div>
+        </div>
+        <div className="mx-auto mt-8 flex w-full max-w-[420px] gap-3">
+          <a
+            href={info?.imageUrl ?? '#'}
+            download={`日签-${info?.date ?? ''}.jpg`}
+            aria-disabled={!info}
+            className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] text-sm tracking-[0.14em] text-[var(--paper)] transition-colors duration-300 ${
+              info ? 'hover:bg-[#3a362f]' : 'pointer-events-none opacity-40'
+            }`}
+          >
+            <Download className="h-4 w-4" strokeWidth={1.6} />
+            收藏此签
+          </a>
+          <button
             onClick={() => regenerate.mutate()}
             disabled={regenerate.isPending || !info}
+            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[2px] border border-[var(--hairline)] bg-transparent text-sm tracking-[0.14em] text-[var(--ink)] transition-colors duration-300 hover:border-[var(--ink-faint)] hover:bg-white/40 disabled:opacity-40"
           >
             {regenerate.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.6} />
             ) : (
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className="h-4 w-4" strokeWidth={1.6} />
             )}
-            换一换
-          </Button>
+            再取一签
+          </button>
         </div>
       </div>
 
-      {/* 信息区 */}
+      {/* 信息区：编辑部式排版，发丝线分隔 */}
       <div className="min-w-0">
-        <p className="font-serif-sc text-sm tracking-[0.3em] text-[#8a8474]">
-          {info ? chineseDate(info.date) : '……'}
-        </p>
-        <h2 className="font-serif-sc mt-2 text-3xl font-semibold leading-snug text-[#2c2a26] sm:text-4xl">
+        <p className="eyebrow">Today · 一天一签</p>
+        <h2 className="font-serif-sc mt-3 text-[27px] font-semibold leading-tight tracking-wide text-[var(--ink)] sm:text-[38px]">
           {info ? friendlyDate(info.date) : '今日日签'}
         </h2>
+        <p className="mt-2 text-xs tracking-[0.24em] text-[var(--ink-faint)]">
+          {info ? numericDate(info.date) : ''}
+        </p>
 
-        <div className="mt-8 rounded-md border border-[#e3ded2] bg-white/60 p-6">
-          <div className="flex items-center gap-2 text-sm text-[#8a8474]">
-            <Feather className="h-4 w-4" />
-            <span>今日文案</span>
+        <div className="mt-9 border-t border-[var(--hairline)] pt-7">
+          <div className="flex items-center gap-2.5">
+            <span className="font-serif-sc text-sm tracking-[0.3em] text-[var(--ink-soft)]">今日之文</span>
+            <span className="h-px flex-1 bg-[var(--hairline-soft)]" aria-hidden />
           </div>
-          {info ? (
-            <FormattedQuote
-              content={info.quoteContent}
-              className="font-serif-sc mt-3 text-lg leading-loose text-[#3a372f]"
-            />
-          ) : (
-            <Skeleton className="mt-3 h-20 w-full" />
-          )}
-          {info?.quoteFootnote && (
-            <p className="mt-4 text-sm italic text-[#9a9384]">&ldquo;{info.quoteFootnote}&rdquo;</p>
-          )}
-          <Separator className="my-5 bg-[#e3ded2]" />
-          <div className="flex items-center gap-2 text-sm text-[#8a8474]">
-            <ImageIcon className="h-4 w-4" />
-            <span>今日背景</span>
-          </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="mt-4">
             {info ? (
-              <>
-                <Badge variant="secondary" className="bg-[#ece9df] text-[#4a463c]">
-                  {info.backgroundLabel}
-                </Badge>
-                <Badge variant="secondary" className="bg-[#ece9df] text-[#4a463c]">
-                  配色 · {paletteLabel}
-                </Badge>
-              </>
+              <FormattedQuote
+                content={info.quoteContent}
+                className="font-serif-sc text-[17px] leading-loose text-[#33302a]"
+              />
             ) : (
-              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-20 w-full" />
+            )}
+            {info?.quoteFootnote && (
+              <p className="mt-4 text-sm italic leading-relaxed text-[var(--ink-faint)]">
+                &ldquo;{info.quoteFootnote}&rdquo;
+              </p>
             )}
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-4">
-          <div className="rounded-md border border-[#e3ded2] bg-white/60 p-5">
-            <p className="text-sm text-[#8a8474]">背景素材</p>
-            <p className="font-serif-sc mt-1 text-2xl text-[#2c2a26]">{bgCount} 张</p>
+        <div className="mt-8 border-t border-[var(--hairline)] pt-7">
+          <div className="flex items-center gap-2.5">
+            <span className="font-serif-sc text-sm tracking-[0.3em] text-[var(--ink-soft)]">今日之底</span>
+            <span className="h-px flex-1 bg-[var(--hairline-soft)]" aria-hidden />
           </div>
-          <div className="rounded-md border border-[#e3ded2] bg-white/60 p-5">
-            <p className="text-sm text-[#8a8474]">文字素材</p>
-            <p className="font-serif-sc mt-1 text-2xl text-[#2c2a26]">{quoteCount} 条</p>
+          <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-[var(--ink-soft)]">
+            {info ? (
+              <>
+                <span>
+                  <span className="text-xs text-[var(--ink-faint)]">背景 </span>
+                  {info.backgroundLabel}
+                </span>
+                <span>
+                  <span className="text-xs text-[var(--ink-faint)]">配色 </span>
+                  {paletteLabel}
+                </span>
+              </>
+            ) : (
+              <Skeleton className="h-5 w-52" />
+            )}
           </div>
         </div>
 
-        <p className="mt-6 text-sm leading-relaxed text-[#8a8474]">
-          每天自动生成一张新日签：从背景库与文字库中各选一份组合排版，并带上当天日期。
-          素材库越大，组合越丰富；添加素材后点「换一换」立刻看到新效果。
+        <div className="mt-8 grid grid-cols-2 border-t border-[var(--hairline)] pt-7">
+          <div className="border-r border-[var(--hairline-soft)] pr-6">
+            <p className="text-xs tracking-[0.2em] text-[var(--ink-faint)]">背景素材</p>
+            <p className="font-serif-sc mt-2 text-3xl text-[var(--ink)]">
+              {bgCount}
+              <span className="ml-1.5 text-sm font-normal text-[var(--ink-soft)]">张</span>
+            </p>
+          </div>
+          <div className="pl-6">
+            <p className="text-xs tracking-[0.2em] text-[var(--ink-faint)]">文字素材</p>
+            <p className="font-serif-sc mt-2 text-3xl text-[var(--ink)]">
+              {quoteCount}
+              <span className="ml-1.5 text-sm font-normal text-[var(--ink-soft)]">条</span>
+            </p>
+          </div>
+        </div>
+
+        <p className="mt-9 text-[13px] leading-[1.9] text-[var(--ink-faint)]">
+          每天一张：从背景库与文字库中各选一份，按当日日期合成。
+          素材库愈丰，相遇愈妙；添了新素材，点「再取一签」即可见新境。
         </p>
       </div>
     </div>

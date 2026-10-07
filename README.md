@@ -22,7 +22,7 @@
 
 - **框架**：Next.js 16（App Router）+ TypeScript + Tailwind CSS 4 + shadcn/ui
 - **合成引擎**：fontkit 精确字形测量排版（避头尾、标点悬挂、字号自适应收缩）→ 逐字形 SVG 路径（**不依赖系统字体，云端渲染结果与本地完全一致**）→ sharp 合成输出
-- **数据**：Prisma + SQLite；图片素材落盘本地 `storage/` 目录
+- **数据**：Prisma + **Vercel Postgres（Neon）**；背景图片与已生成日签图均以二进制（BYTEA）直接入库，跨实例、跨冷启动持久有效；本地开发可用 SQLite（`prisma/schema.prisma`），生产使用 PostgreSQL（`prisma/schema.postgres.prisma`，postinstall 按环境自动选择）
 - **字体**：宋体（Noto Serif SC）与文楷（LXGW WenKai）已随仓库打包于 `assets/fonts/`
 
 ## 本地开发
@@ -34,12 +34,13 @@ bun run db:push        # 初始化数据库表结构
 bun run dev            # 开发模式 http://localhost:3000
 ```
 
-首次访问时自动注入初始素材（8 张水彩背景 + 8 条精选文案）。
+首次访问时自动注入初始素材（8 张水彩背景 + 8 条精选文案），图片与文案直接写入数据库。
 
-## 部署说明（Vercel）
+## 部署说明（Vercel + Vercel Postgres）
 
-仓库可直接导入 Vercel 一键部署，无需额外配置：
+仓库可直接导入 Vercel 部署：
 
-- 构建时自动执行 `prisma generate`（postinstall）
-- 无服务器环境下数据库与图片缓存自动降级到 `/tmp`，冷启动时按需重建初始素材
-- ⚠️ 注意：无服务器文件系统是**临时性**的，上传的自定义背景、新增文案在实例冷启动后会重置为初始素材；若需持久化，可接入 Vercel Postgres 或其他数据库服务
+1. **数据库**：在 Vercel 项目中创建/关联 Storage → Neon（Postgres）。集成会把 `DATABASE_URL`、`POSTGRES_PRISMA_URL` 等环境变量自动注入运行时，无需手动配置；应用冷启动时通过 `ensureSchema()` 幂等自举建表，并自动播种初始素材（种子使用固定主键，并发冷启动不会重复）。
+2. **构建**：postinstall 检测 Vercel 环境后以 `prisma/schema.postgres.prisma` 生成 Prisma Client；字体文件经 `outputFileTracingIncludes` 追踪进 API 函数。
+3. **上传**：前端先行压缩（长边 ≤1920、JPEG 0.85）并逐张提交，符合 Serverless 请求体限制。
+4. **持久化**：所有素材、每日记录与合成图片均在 Postgres 中持久保存；删除实例/冷启动不会丢失任何数据。

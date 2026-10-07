@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Feather, Trash2, Loader2, Lightbulb } from 'lucide-react';
+import { Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FormattedQuote } from './FormattedQuote';
 import { plainLength } from '@/lib/text-parser';
@@ -63,7 +63,7 @@ export function QuotesTab() {
       return resData;
     },
     onSuccess: () => {
-      toast.success('文案已加入素材库');
+      toast.success('文字已收入库中');
       setContent('');
       setFootnote('');
       refresh();
@@ -77,7 +77,7 @@ export function QuotesTab() {
       if (!res.ok) throw new Error('删除失败');
     },
     onSuccess: () => {
-      toast.success('文案已删除');
+      toast.success('文字已删除');
       refresh();
     },
     onError: () => toast.error('删除失败'),
@@ -86,122 +86,133 @@ export function QuotesTab() {
   const plen = plainLength(content);
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start">
-      {/* 新增表单 */}
-      <div className="rounded-md border border-[#e3ded2] bg-white/60 p-6">
-        <div className="flex items-center gap-2">
-          <Feather className="h-4 w-4 text-[#6f6a60]" />
-          <h3 className="font-serif-sc text-lg text-[#2c2a26]">写一段今日的文字</h3>
+    <div>
+      <p className="eyebrow">Words · 文字库</p>
+      <h2 className="font-serif-sc mt-2 text-2xl font-semibold tracking-wide text-[var(--ink)]">
+        一字一心
+      </h2>
+      <p className="mt-2 text-[13px] leading-relaxed text-[var(--ink-faint)]">
+        写下的每一段话，都会在某天与一张图相遇。
+      </p>
+
+      <div className="mt-6 grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-14">
+        {/* 新增表单 */}
+        <div>
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="quote-content" className="text-xs tracking-[0.2em] text-[var(--ink-soft)]">
+                正文
+              </Label>
+              <Textarea
+                id="quote-content"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={7}
+                placeholder={'把想说的话写在这里，空行分段。\n用【文字】做高亮块，用~~文字~~做下划线。'}
+                className="rounded-[2px] border-[var(--hairline)] bg-white/50 font-serif-sc text-[15px] leading-relaxed text-[#33302a] focus-visible:ring-[var(--ink-faint)]/40"
+              />
+              <p className="text-right text-xs text-[var(--ink-faint)]">{plen} / 500 字</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="quote-footnote" className="text-xs tracking-[0.2em] text-[var(--ink-soft)]">
+                英文注脚 · 卡片底部手写体（可选）
+              </Label>
+              <Input
+                id="quote-footnote"
+                value={footnote}
+                onChange={(e) => setFootnote(e.target.value)}
+                placeholder="Do not go gentle into that good night."
+                className="rounded-[2px] border-[var(--hairline)] bg-white/50 focus-visible:ring-[var(--ink-faint)]/40"
+              />
+            </div>
+            <button
+              onClick={() => createQuote.mutate()}
+              disabled={createQuote.isPending}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] text-sm tracking-[0.18em] text-[var(--paper)] transition-colors duration-300 hover:bg-[#3a362f] disabled:opacity-40"
+            >
+              {createQuote.isPending ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.6} /> : null}
+              存入文字库
+            </button>
+            <p className="border-l-2 border-[var(--hairline)] pl-3.5 text-xs leading-[1.9] text-[var(--ink-faint)]">
+              【文字】呈色块高亮，~~文字~~呈下划线；空行分段，卡片自动排版，
+              字多时自动缩小字号以合于版心。
+            </p>
+          </div>
         </div>
-        <div className="mt-4 space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="quote-content" className="text-sm text-[#4a463c]">
-              正文
-            </Label>
-            <Textarea
-              id="quote-content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={6}
-              placeholder={'把想说的话写在这里，空行分段。\n用【文字】做高亮块，用~~文字~~做下划线。'}
-              className="font-serif-sc min-h-[140px] resize-y border-[#ddd7c8] bg-white/80 text-[15px] leading-relaxed focus-visible:ring-[#b8b2a0]"
-            />
-            <p className="text-right text-xs text-[#9a9384]">{plen} / 500 字</p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="quote-footnote" className="text-sm text-[#4a463c]">
-              英文注脚（可选，卡片底部手写体）
-            </Label>
-            <Input
-              id="quote-footnote"
-              value={footnote}
-              onChange={(e) => setFootnote(e.target.value)}
-              placeholder="Do not go gentle into that good night."
-              className="border-[#ddd7c8] bg-white/80 focus-visible:ring-[#b8b2a0]"
-            />
-          </div>
-          <Button
-            onClick={() => createQuote.mutate()}
-            disabled={createQuote.isPending}
-            className="w-full bg-[#2c2a26] text-[#f6f4ee] hover:bg-[#443f37]"
-          >
-            {createQuote.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            存入文字库
-          </Button>
-          <div className="flex items-start gap-2 rounded-sm bg-[#f1eee5] p-3 text-xs leading-relaxed text-[#8a8474]">
-            <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>
-              标记语法：【文字】→ 色块高亮；~~文字~~ → 下划线。空行分段，卡片会自动排版换行；
-              文字较多时会自动缩小字号以适配卡片。
+
+        {/* 列表：发丝线分隔的编辑部条目 */}
+        <div className="min-w-0">
+          <div className="flex items-baseline justify-between border-b border-[var(--hairline)] pb-3">
+            <span className="font-serif-sc text-sm tracking-[0.3em] text-[var(--ink-soft)]">已收文字</span>
+            <span className="text-xs text-[var(--ink-faint)]">
+              {items ? `${items.length} 条` : ''}
             </span>
           </div>
-        </div>
-      </div>
-
-      {/* 列表 */}
-      <div className="min-w-0">
-        <h3 className="font-serif-sc text-lg text-[#2c2a26]">
-          文字库 <span className="ml-1 text-sm text-[#9a9384]">{items ? `${items.length} 条` : ''}</span>
-        </h3>
-        {isLoading || items === null ? (
-          <div className="mt-4 space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-24 w-full rounded-md" />
-            ))}
-          </div>
-        ) : items.length === 0 ? (
-          <p className="mt-10 text-center text-sm text-[#9a9384]">
-            文字库还是空的，先写下第一段吧。
-          </p>
-        ) : (
-          <div className="pretty-scroll mt-4 max-h-[640px] space-y-3 overflow-y-auto pr-1">
-            {items.map((it) => (
-              <div key={it.id} className="rounded-md border border-[#e3ded2] bg-white/60 p-4">
-                <FormattedQuote
-                  content={it.content}
-                  className="font-serif-sc text-[15px] leading-relaxed text-[#3a372f]"
-                />
-                {it.footnote && (
-                  <p className="mt-2 text-xs italic text-[#9a9384]">&ldquo;{it.footnote}&rdquo;</p>
-                )}
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="text-xs text-[#b0a996]">
-                    {new Date(it.createdAt).toLocaleDateString('zh-CN')}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="删除文案"
-                    className="h-8 w-8 text-[#b0a996] hover:bg-[#f3e9e4] hover:text-[#b4543a]"
-                    onClick={() => setDeleteId(it.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+          {isLoading || items === null ? (
+            <div className="mt-5 space-y-6">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-20 w-full rounded-none" />
+              ))}
+            </div>
+          ) : items.length === 0 ? (
+            <p className="mt-12 text-center font-serif-sc text-sm tracking-[0.2em] text-[var(--ink-faint)]">
+              文字库还空着，等第一句话。
+            </p>
+          ) : (
+            <div className="pretty-scroll max-h-[620px] overflow-y-auto pr-1.5">
+              {items.map((it, idx) => (
+                <div
+                  key={it.id}
+                  className={`group py-5 ${idx > 0 ? 'border-t border-[var(--hairline-soft)]' : ''}`}
+                >
+                  <FormattedQuote
+                    content={it.content}
+                    className="font-serif-sc text-[14.5px] leading-relaxed text-[#33302a]"
+                  />
+                  {it.footnote && (
+                    <p className="mt-2.5 text-xs italic leading-relaxed text-[var(--ink-faint)]">
+                      &ldquo;{it.footnote}&rdquo;
+                    </p>
+                  )}
+                  <div className="mt-3 flex items-center justify-between">
+                    <span className="text-[11px] tracking-[0.12em] text-[var(--ink-faint)]/80">
+                      {new Date(it.createdAt).toLocaleDateString('zh-CN')}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="删除文案"
+                      className="h-7 w-7 text-[var(--ink-faint)]/70 opacity-0 transition-opacity hover:bg-[#f3e9e4] hover:text-[#a8503a] focus-visible:opacity-100 group-hover:opacity-100"
+                      onClick={() => setDeleteId(it.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" strokeWidth={1.6} />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="border-[var(--hairline)] bg-[var(--paper)] rounded-[2px]">
           <AlertDialogHeader>
-            <AlertDialogTitle>删除这条文案？</AlertDialogTitle>
+            <AlertDialogTitle className="font-serif-sc tracking-wide">删去这段文字？</AlertDialogTitle>
             <AlertDialogDescription>
-              删除后不可恢复。若今日日签正在使用它，系统会自动重新选文。
+              删后不可恢复。若今日日签正在用它，会自动另择一文。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-[2px]">留下</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-[#b4543a] text-white hover:bg-[#9c452e]"
+              className="rounded-[2px] bg-[#a8503a] text-white hover:bg-[#8f4330]"
               onClick={() => {
                 if (deleteId) removeQuote.mutate(deleteId);
                 setDeleteId(null);
               }}
             >
-              删除
+              删去
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

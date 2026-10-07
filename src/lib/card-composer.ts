@@ -354,7 +354,7 @@ function chineseDateLocal(dateStr: string): string {
 
 // ---------- 合成 ----------
 export interface ComposeInput {
-  backgroundPath?: string | null;
+  backgroundBuffer?: Buffer | null; // 背景图 JPEG/PNG 二进制（来自数据库）
   dateStr: string;
   content: string;
   footnote?: string | null;
@@ -370,8 +370,8 @@ export async function composeCard(input: ComposeInput): Promise<ComposeResult> {
   let imgBuf: Buffer;
   let stats: { r: number; g: number; b: number } | undefined;
 
-  if (input.backgroundPath) {
-    imgBuf = await sharp(input.backgroundPath)
+  if (input.backgroundBuffer && input.backgroundBuffer.length > 0) {
+    imgBuf = await sharp(input.backgroundBuffer)
       .rotate()
       .resize(CARD_W, CARD_H, { fit: 'cover', position: 'centre' })
       .toBuffer();

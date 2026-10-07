@@ -1,22 +1,7 @@
 // 首次启动种子：程序化生成水彩质感初始背景 + 导入参考图文案
-// 使用 storage/.seeded 标记文件防止重复注入
+// 图片本体直接写入数据库（Postgres BYTEA / SQLite BLOB），跨实例持久化，不再依赖临时文件
 import sharp from 'sharp';
-import fs from 'fs';
-import path from 'path';
 import { db, ensureSchema } from './db';
-
-// 存储目录：Vercel 等只读文件系统环境下使用 /tmp（冷启动自动重建种子数据）
-export const STORAGE_DIR =
-  process.env.STORAGE_DIR ||
-  (process.env.VERCEL ? '/tmp/timeread-storage' : path.join(process.cwd(), 'storage'));
-export const BG_DIR = path.join(STORAGE_DIR, 'bg');
-export const CARD_DIR = path.join(STORAGE_DIR, 'cards');
-const SEEDED_FLAG = path.join(STORAGE_DIR, '.seeded');
-
-export function ensureDirs() {
-  fs.mkdirSync(BG_DIR, { recursive: true });
-  fs.mkdirSync(CARD_DIR, { recursive: true });
-}
 
 // ---------- 确定性随机 ----------
 export function mulberry32(seed: number) {
@@ -148,14 +133,16 @@ const INITIAL_QUOTES: { content: string; footnote?: string }[] = [
   },
 ];
 
+// 固定种子 ID：并发冷启动时重复播种会因主键冲突被安全跳过
+const seedBgId = (i: number) => `preset-bg-${i + 1}`;
+const seedQuoteId = (i: number) => `preset-quote-${i + 1}`;
+
 let seeding: Promise<void> | null = null;
 
 export async function ensureSeeded(): Promise<void> {
   if (seeding) return seeding;
   seeding = (async () => {
-    await ensureSchema(); // 空库（serverless 冷启动）自动建表
-    ensureDirs();
-    if (fs.existsSync(SEEDED_FLAG)) return;
+    await ensureSchema(); // 空库（Neon 首次接入）自动建表
     try {
       const bgCount = await db.background.count();
       const quoteCount = await db.quote.count();
@@ -163,19 +150,27 @@ export async function ensureSeeded(): Promise<void> {
         for (let i = 0; i < BG_SPECS.length; i++) {
           const spec = BG_SPECS[i];
           const buf = await generateWatercolorBg(spec, i);
-          const filename = `preset_${i}_${Date.now()}.jpg`;
-          fs.writeFileSync(path.join(BG_DIR, filename), buf);
-          await db.background.create({
-            data: { filename, label: spec.name, origin: 'preset', palette: spec.palette },
-          });
+          await db.background
+            .create({
+              data: { id: seedBgId(i), label: spec.name, origin: 'preset', palette: spec.palette, data: buf },
+            })
+            .catch(() => {
+              /* 并发种子冲突：已存在则跳过 */
+            });
         }
       }
       if (quoteCount === 0) {
-        for (const q of INITIAL_QUOTES) {
-          await db.quote.create({ data: { content: q.content, footnote: q.footnote ?? null } });
+        for (let i = 0; i < INITIAL_QUOTES.length; i++) {
+          const q = INITIAL_QUOTES[i];
+          await db.quote
+            .create({
+              data: { id: seedQuoteId(i), content: q.content, footnote: q.footnote ?? null },
+            })
+            .catch(() => {
+              /* 并发种子冲突：已存在则跳过 */
+            });
         }
       }
-      fs.writeFileSync(SEEDED_FLAG, new Date().toISOString());
     } catch (e) {
       console.error('[seed] failed:', e);
       seeding = null; // 允许下次重试

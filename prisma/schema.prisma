@@ -8,12 +8,13 @@ datasource db {
 }
 
 // 图片背景素材库（可扩充）
+// 图片本体（JPEG）以二进制直接入库，天然跨平台持久化（本地 BLOB / Vercel Postgres BYTEA）
 model Background {
   id        String   @id @default(cuid())
-  filename  String   // 存储文件名（storage/bg 目录下）
   label     String   @default("") // 展示名称
   origin    String   @default("upload") // upload | preset
   palette   String   @default("auto")   // 文字配色方案 key
+  data      Bytes?   // 图片 JPEG 二进制
   createdAt DateTime @default(now())
 }
 
@@ -26,11 +27,13 @@ model Quote {
 }
 
 // 每日生成的日签记录
+// 合成图（JPEG）同样入库：记录一经生成即永久留存，不依赖临时文件系统
 model DailyCard {
   id           String   @id @default(cuid())
   date         String   @unique // YYYY-MM-DD（Asia/Shanghai）
   backgroundId String
   quoteId      String
   variant      Int      @default(0) // 手动"换一换"次数，参与随机种子
+  image        Bytes?   // 已合成日签 JPEG（置空则下次访问重生成）
   createdAt    DateTime @default(now())
 }

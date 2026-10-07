@@ -1,11 +1,10 @@
-// 统一 API 入口（catch-all）：所有接口收敛到同一个 Serverless 函数，
-// 保证 Vercel 等无服务器平台上 /tmp 数据库与图片文件在同一实例内一致。
+// 统一 API 入口（catch-all）：所有接口收敛到同一个 Serverless 函数。
+// 持久化说明：背景图与日签图本体均存于数据库（Vercel Postgres / Neon），
+// 跨实例、跨冷启动持久有效，无临时文件依赖。
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 import sharp from 'sharp';
 import { db } from '@/lib/db';
-import { BG_DIR, ensureDirs, ensureSeeded } from '@/lib/seed';
+import { ensureSeeded } from '@/lib/seed';
 import { ensureDaily, regenerateDaily, listHistory, invalidateCardFor } from '@/lib/daily';
 import { todayStr } from '@/lib/date-utils';
 import { plainLength } from '@/lib/text-parser';
@@ -15,10 +14,19 @@ export const dynamic = 'force-dynamic';
 
 type Ctx = { params: Promise<{ path?: string[] }> };
 
-const MAX_SIZE = 20 * 1024 * 1024;
+const MAX_SIZE = 12 * 1024 * 1024; // 前端会先行压缩，此为服务端兜底
 
 function json(data: unknown, status = 200) {
   return NextResponse.json(data, { status });
+}
+
+function imageResponse(buf: Buffer, cacheControl: string) {
+  return new NextResponse(new Uint8Array(buf), {
+    headers: {
+      'Content-Type': 'image/jpeg',
+      'Cache-Control': cacheControl,
+    },
+  });
 }
 
 function sanitizeLabel(name: string): string {
@@ -70,21 +78,13 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     return json({ items });
   }
 
-  // 背景图片流
+  // 背景图片流（图片本体存于数据库）
   if (segs[0] === 'backgrounds' && segs.length === 3 && segs[2] === 'image') {
     await ensureSeeded();
     const id = segs[1];
-    const row = await db.background.findUnique({ where: { id } });
-    if (!row) return new NextResponse('Not Found', { status: 404 });
-    const fp = path.join(BG_DIR, row.filename);
-    if (!fs.existsSync(fp)) return new NextResponse('Not Found', { status: 404 });
-    const buf = await fs.promises.readFile(fp);
-    return new NextResponse(new Uint8Array(buf), {
-      headers: {
-        'Content-Type': 'image/jpeg',
-        'Cache-Control': 'public, max-age=31536000, immutable',
-      },
-    });
+    const row = await db.background.findUnique({ where: { id }, select: { data: true } });
+    if (!row?.data) return new NextResponse('Not Found', { status: 404 });
+    return imageResponse(Buffer.from(row.data), 'public, max-age=31536000, immutable');
   }
 
   // 当日（或指定日期）日签信息
@@ -104,20 +104,11 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     });
   }
 
-  // 日签图片（首次访问自动生成并落盘）
+  // 日签图片（首次访问自动生成并入库）
   if (segs[0] === 'card-image' && segs.length === 1) {
     const date = req.nextUrl.searchParams.get('date') ?? undefined;
     const info = await ensureDaily(date ?? undefined);
-    if (!fs.existsSync(info.imagePath)) {
-      return new NextResponse('Not Found', { status: 404 });
-    }
-    const buf = await fs.promises.readFile(info.imagePath);
-    return new NextResponse(new Uint8Array(buf), {
-      headers: {
-        'Content-Type': 'image/jpeg',
-        'Cache-Control': 'public, max-age=86400',
-      },
-    });
+    return imageResponse(info.image, 'public, max-age=86400');
   }
 
   return json({ error: 'Not Found' }, 404);
@@ -140,16 +131,15 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     // 新文案进入素材池后，当日首卡重新随机
     const rec = await db.dailyCard.findUnique({ where: { date: todayStr() } });
     if (rec && rec.variant === 0) {
-      await db.dailyCard.delete({ where: { date: todayStr() } }).catch(() => {});
+      await db.dailyCard.update({ where: { date: todayStr() }, data: { image: null } }).catch(() => {});
       await invalidateCardFor(todayStr());
     }
     return json({ item: row });
   }
 
-  // 上传背景（支持多文件）
+  // 上传背景（前端逐张压缩后上传；本端点单次处理一张，图片入库）
   if (segs[0] === 'backgrounds' && segs.length === 1) {
     await ensureSeeded();
-    ensureDirs();
     const form = await req.formData();
     const files = form.getAll('files').filter((f): f is File => f instanceof File);
     if (files.length === 0) return json({ error: '未收到图片文件' }, 400);
@@ -158,7 +148,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     for (const file of files) {
       try {
         if (file.size > MAX_SIZE) {
-          rejected.push(`${file.name}（超过 20MB）`);
+          rejected.push(`${file.name}（文件过大）`);
           continue;
         }
         const buf = Buffer.from(await file.arrayBuffer());
@@ -174,12 +164,9 @@ export async function POST(req: NextRequest, ctx: Ctx) {
         if (Math.max(w, h) > 2160) {
           img = img.resize(2160, 2160, { fit: 'inside' });
         }
-        const out = await img.flatten({ background: '#ffffff' }).jpeg({ quality: 88, mozjpeg: true }).toBuffer();
-        const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        const filename = `up_${id}.jpg`;
-        fs.writeFileSync(path.join(BG_DIR, filename), out);
+        const out = await img.flatten({ background: '#ffffff' }).jpeg({ quality: 86, mozjpeg: true }).toBuffer();
         const row = await db.background.create({
-          data: { filename, label: sanitizeLabel(file.name), origin: 'upload', palette: 'auto' },
+          data: { label: sanitizeLabel(file.name), origin: 'upload', palette: 'auto', data: out },
         });
         created.push({ id: row.id, label: row.label });
       } catch (e) {
@@ -190,7 +177,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     if (created.length > 0) {
       const rec = await db.dailyCard.findUnique({ where: { date: todayStr() } });
       if (rec && rec.variant === 0) {
-        await db.dailyCard.delete({ where: { date: todayStr() } }).catch(() => {});
+        await db.dailyCard.update({ where: { date: todayStr() }, data: { image: null } }).catch(() => {});
         await invalidateCardFor(todayStr());
       }
     }
@@ -255,21 +242,13 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
     return json({ ok: true });
   }
 
-  // 删除背景
+  // 删除背景（图片本体随行删除）
   if (segs[0] === 'backgrounds' && segs.length === 2) {
     await ensureSeeded();
     const id = segs[1];
     const row = await db.background.findUnique({ where: { id } });
     if (!row) return json({ error: '背景不存在' }, 404);
     await db.background.delete({ where: { id } });
-    const fp = path.join(BG_DIR, row.filename);
-    if (fs.existsSync(fp)) {
-      try {
-        fs.unlinkSync(fp);
-      } catch {
-        /* ignore */
-      }
-    }
     await invalidateCardFor(todayStr());
     return json({ ok: true });
   }

@@ -121,44 +121,95 @@
   }
 }
 
-/* ---------- 每日日签主题 ---------- */
+/* ---------- 每日日签 · 纸墨主题（高级 · 克制 · 诗意） ---------- */
 :root {
-  --paper: #f6f4ee;
-  --ink: #2c2a26;
-  --ink-soft: #6f6a60;
-  --hairline: #e3ded2;
+  --paper: #f4f1ea;
+  --paper-deep: #ece8de;
+  --ink: #1e1c19;
+  --ink-soft: #6b665c;
+  --ink-faint: #97907f;
+  --accent: #8a7a5c;
+  --hairline: #ddd6c7;
+  --hairline-soft: #e7e2d6;
 }
 
 body {
   background-color: var(--paper);
   background-image:
-    radial-gradient(1200px 500px at 85% -10%, rgba(178, 196, 178, 0.16), transparent 60%),
-    radial-gradient(900px 420px at -10% 20%, rgba(210, 190, 168, 0.14), transparent 55%);
+    radial-gradient(1300px 520px at 88% -12%, rgba(170, 186, 170, 0.13), transparent 62%),
+    radial-gradient(1000px 460px at -12% 18%, rgba(206, 186, 160, 0.12), transparent 58%),
+    radial-gradient(700px 380px at 50% 120%, rgba(190, 180, 158, 0.1), transparent 60%);
   color: var(--ink);
+}
+
+/* 细腻纸纹颗粒（极低透明度，增加纸的触感） */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+#root-shell {
+  position: relative;
+  z-index: 1;
 }
 
 .font-serif-sc {
   font-family: var(--font-serif-sc), "Songti SC", "STSong", "SimSun", serif;
 }
 
+/* 竖排诗意标注 */
+.v-text {
+  writing-mode: vertical-rl;
+  letter-spacing: 0.42em;
+  text-orientation: upright;
+}
+
+/* 英文小标（眉题） */
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
 /* 细腻滚动条 */
 .pretty-scroll::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 .pretty-scroll::-webkit-scrollbar-thumb {
-  background: #d8d2c4;
+  background: #d5cec0;
   border-radius: 999px;
 }
 .pretty-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* 日签卡投影 */
+/* 日签卡投影（美术馆式柔和展墙光） */
 .card-shadow {
   box-shadow:
-    0 1px 2px rgba(44, 42, 38, 0.08),
-    0 12px 40px -8px rgba(44, 42, 38, 0.22);
+    0 1px 2px rgba(30, 28, 25, 0.06),
+    0 18px 50px -12px rgba(30, 28, 25, 0.24);
+}
+.card-shadow-soft {
+  box-shadow:
+    0 1px 2px rgba(30, 28, 25, 0.05),
+    0 10px 32px -10px rgba(30, 28, 25, 0.16);
+}
+
+/* 卡片外衬（留白装裱线） */
+.mat-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translate(12px, 12px);
+  border: 1px solid var(--hairline);
+  pointer-events: none;
 }
 
 /* 高亮标记（列表预览用） */
@@ -172,4 +223,25 @@ body {
   text-decoration: underline;
   text-underline-offset: 0.22em;
   text-decoration-thickness: 2px;
+}
+
+/* 导航下划线动画 */
+.nav-underline {
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nav-underline.active {
+  transform: scaleX(1);
+}
+
+/* 悬浮轻抬 */
+.lift {
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.lift:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 1px 2px rgba(30, 28, 25, 0.06),
+    0 16px 42px -12px rgba(30, 28, 25, 0.22);
 }

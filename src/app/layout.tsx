@@ -11,10 +11,10 @@ const serifSC = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "每日日签 · 每天一张图文卡片",
+  title: "TimeRead · 每日日签",
   description:
-    "两个可扩充素材库：图片背景与文字。每天自动生成一张结合背景与文字的日签图片，带上当天日期，随时下载分享。",
-  keywords: ["日签", "每日一图", "图片生成", "素材库", "文案"],
+    "背景与文字，两个可扩充的素材库。每天自动合成一张带当天日期的日签图片，克制排版，诗意呈现，随时收藏分享。",
+  keywords: ["日签", "每日一图", "图片生成", "素材库", "文案", "TimeRead"],
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },

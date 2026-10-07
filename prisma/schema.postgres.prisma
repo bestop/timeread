@@ -1,0 +1,39 @@
+// Vercel 生产环境 schema（PostgreSQL / Neon）
+// 本地开发使用 prisma/schema.prisma（SQLite）；部署 Vercel 时 postinstall 按环境选择本文件生成客户端
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 图片背景素材库（可扩充）
+model Background {
+  id        String   @id @default(cuid())
+  label     String   @default("")
+  origin    String   @default("upload")
+  palette   String   @default("auto")
+  data      Bytes?   // 图片 JPEG 二进制（BYTEA）
+  createdAt DateTime @default(now())
+}
+
+// 文字素材库（可扩充）
+model Quote {
+  id        String   @id @default(cuid())
+  content   String
+  footnote  String?
+  createdAt DateTime @default(now())
+}
+
+// 每日生成的日签记录
+model DailyCard {
+  id           String   @id @default(cuid())
+  date         String   @unique
+  backgroundId String
+  quoteId      String
+  variant      Int      @default(0)
+  image        Bytes?   // 已合成日签 JPEG（BYTEA）
+  createdAt    DateTime @default(now())
+}

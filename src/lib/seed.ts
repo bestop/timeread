@@ -3,7 +3,7 @@
 import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
-import { db } from './db';
+import { db, ensureSchema } from './db';
 
 // 存储目录：Vercel 等只读文件系统环境下使用 /tmp（冷启动自动重建种子数据）
 export const STORAGE_DIR =
@@ -153,6 +153,7 @@ let seeding: Promise<void> | null = null;
 export async function ensureSeeded(): Promise<void> {
   if (seeding) return seeding;
   seeding = (async () => {
+    await ensureSchema(); // 空库（serverless 冷启动）自动建表
     ensureDirs();
     if (fs.existsSync(SEEDED_FLAG)) return;
     try {

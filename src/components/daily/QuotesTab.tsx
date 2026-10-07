@@ -109,7 +109,7 @@ export function QuotesTab() {
                 onChange={(e) => setContent(e.target.value)}
                 rows={7}
                 placeholder={'把想说的话写在这里，空行分段。\n用【文字】做高亮块，用~~文字~~做下划线。'}
-                className="rounded-[2px] border-[var(--hairline)] bg-white/50 font-serif-sc text-[15px] leading-relaxed text-[#33302a] focus-visible:ring-[var(--ink-faint)]/40"
+                className="rounded-[2px] border-[var(--hairline)] bg-white/50 font-serif-sc text-[16px] leading-relaxed text-[#33302a] focus-visible:ring-[var(--ink-faint)]/40 sm:text-[15px]"
               />
               <p className="text-right text-xs text-[var(--ink-faint)]">{plen} / 500 字</p>
             </div>
@@ -122,7 +122,7 @@ export function QuotesTab() {
                 value={footnote}
                 onChange={(e) => setFootnote(e.target.value)}
                 placeholder="Do not go gentle into that good night."
-                className="rounded-[2px] border-[var(--hairline)] bg-white/50 focus-visible:ring-[var(--ink-faint)]/40"
+                className="rounded-[2px] border-[var(--hairline)] bg-white/50 text-[16px] focus-visible:ring-[var(--ink-faint)]/40 sm:text-sm"
               />
             </div>
             <button
@@ -182,7 +182,7 @@ export function QuotesTab() {
                       variant="ghost"
                       size="icon"
                       aria-label="删除文案"
-                      className="h-7 w-7 text-[var(--ink-faint)]/70 opacity-0 transition-opacity hover:bg-[#f3e9e4] hover:text-[#a8503a] focus-visible:opacity-100 group-hover:opacity-100"
+                      className="h-8 w-8 text-[var(--ink-faint)]/70 opacity-70 transition-opacity hover:bg-[#f3e9e4] hover:text-[#a8503a] focus-visible:opacity-100 sm:h-7 sm:w-7 sm:opacity-0 sm:group-hover:opacity-100"
                       onClick={() => setDeleteId(it.id)}
                     >
                       <Trash2 className="h-3.5 w-3.5" strokeWidth={1.6} />

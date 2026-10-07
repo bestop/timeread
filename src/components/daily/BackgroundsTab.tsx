@@ -181,7 +181,7 @@ export function BackgroundsTab() {
           setDragOver(false);
           if (e.dataTransfer.files?.length) uploadFiles(e.dataTransfer.files);
         }}
-        className={`mt-6 flex min-h-[148px] cursor-pointer flex-col items-center justify-center gap-2.5 border border-dashed p-8 text-center transition-all duration-300 ${
+        className={`mt-6 flex min-h-[148px] cursor-pointer flex-col items-center justify-center gap-2.5 border border-dashed p-6 text-center transition-all duration-300 sm:p-8 ${
           dragOver
             ? 'border-[var(--ink-soft)] bg-white/70'
             : 'border-[var(--hairline)] bg-white/35 hover:border-[var(--ink-faint)] hover:bg-white/55'

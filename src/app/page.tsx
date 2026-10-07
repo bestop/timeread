@@ -51,23 +51,24 @@ function Shell() {
     <div id="root-shell" className="flex min-h-screen flex-col">
       {/* 头部：细线之下是导航，之上是品牌与日期 */}
       <header className="sticky top-0 z-40 border-b border-[var(--hairline)] bg-[var(--paper)]/88 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-end justify-between gap-4 px-5 pb-3 pt-6 sm:px-8">
-          <div className="flex items-baseline gap-3">
-            <span className="font-serif-sc text-[22px] font-semibold tracking-[0.08em] text-[var(--ink)]">
-              TimeRead
+        <div className="mx-auto flex max-w-5xl items-end justify-between gap-4 px-5 pb-3 pt-4 sm:px-8 sm:pt-6">
+          <div className="flex items-baseline gap-2.5 sm:gap-3">
+            <span className="font-serif-sc text-[21px] font-semibold tracking-[0.08em] text-[var(--ink)] sm:text-[22px]">
+              时光贴
             </span>
+            <span className="eyebrow !text-[9px] sm:!text-[10px]">TimeTap</span>
             <span className="hidden h-3.5 w-px bg-[var(--hairline)] sm:block" aria-hidden />
             <span className="hidden text-xs tracking-[0.42em] text-[var(--ink-soft)] sm:block">
               每日日签
             </span>
           </div>
-          <p className="hidden text-right font-serif-sc text-[13px] leading-relaxed text-[var(--ink-soft)] sm:block">
+          <p className="text-right font-serif-sc text-[11px] leading-relaxed text-[var(--ink-soft)] sm:text-[13px]">
             {friendlyDate(today)}
           </p>
         </div>
         {/* 标签导航 */}
         <nav aria-label="主导航" className="mx-auto max-w-5xl px-5 sm:px-8">
-          <div className="flex gap-6 overflow-x-auto sm:gap-9">
+          <div className="no-scrollbar flex gap-5 overflow-x-auto sm:gap-9">
             {TABS.map((t) => {
               const activeTab = tab === t.key;
               return (
@@ -75,20 +76,20 @@ function Shell() {
                   key={t.key}
                   onClick={() => setTab(t.key)}
                   aria-current={activeTab ? 'page' : undefined}
-                  className={`relative shrink-0 pb-3 pt-1 text-sm transition-colors duration-300 ${
+                  className={`relative shrink-0 pb-3 pt-1.5 text-[13px] transition-colors duration-300 sm:text-sm ${
                     activeTab ? 'text-[var(--ink)]' : 'text-[var(--ink-faint)] hover:text-[var(--ink-soft)]'
                   }`}
                 >
                   <span className="flex items-baseline gap-1.5">
                     <span
-                      className={`text-[10px] transition-colors duration-300 ${
+                      className={`text-[9px] transition-colors duration-300 sm:text-[10px] ${
                         activeTab ? 'text-[var(--accent)]' : 'text-[var(--ink-faint)]/60'
                       }`}
                       aria-hidden
                     >
                       {t.num}
                     </span>
-                    <span className="font-serif-sc tracking-[0.18em]">{t.label}</span>
+                    <span className="font-serif-sc tracking-[0.1em] sm:tracking-[0.18em]">{t.label}</span>
                   </span>
                   <span
                     className={`nav-underline absolute inset-x-0 bottom-0 h-px bg-[var(--ink)] ${
@@ -104,7 +105,7 @@ function Shell() {
       </header>
 
       {/* 主体 */}
-      <main className="mx-auto w-full max-w-5xl flex-1 px-5 py-10 sm:px-8 sm:py-14">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-5 py-8 sm:px-8 sm:py-14">
         <div key={tab} className="animate-in fade-in slide-in-from-bottom-3 duration-500">
           {tab === 'today' && (
             <TodayTab bgCount={bgData?.items?.length ?? 0} quoteCount={quoteData?.items?.length ?? 0} />
@@ -121,7 +122,7 @@ function Shell() {
           <p className="font-serif-sc text-[13px] tracking-[0.32em] text-[var(--ink-soft)]">
             日日是好日
           </p>
-          <p className="eyebrow">TimeRead · A Daily Card of Words &amp; Scenes</p>
+          <p className="eyebrow">TimeTap · A Daily Card of Words &amp; Scenes</p>
         </div>
       </footer>
     </div>

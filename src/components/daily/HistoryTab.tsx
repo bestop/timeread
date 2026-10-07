@@ -114,7 +114,7 @@ export function HistoryTab() {
               <div className="mt-6 flex justify-center">
                 <a
                   href={active.imageUrl}
-                  download={`日签-${active.date}.jpg`}
+                  download={`时光贴-${active.date}.jpg`}
                   className="flex h-10 items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] px-6 text-sm tracking-[0.14em] text-[var(--paper)] transition-colors duration-300 hover:bg-[#3a362f]"
                 >
                   <Download className="h-4 w-4" strokeWidth={1.6} />

@@ -121,25 +121,26 @@
   }
 }
 
-/* ---------- 每日日签 · 纸墨主题（高级 · 克制 · 诗意） ---------- */
+/* ---------- 每日日签 · 纸墨主题（高级 · 克制 · 诗意 · 近白纸色） ---------- */
 :root {
-  --paper: #f4f1ea;
-  --paper-deep: #ece8de;
+  --paper: #fbfaf7;
+  --paper-deep: #f3f1ea;
   --ink: #1e1c19;
-  --ink-soft: #6b665c;
-  --ink-faint: #97907f;
+  --ink-soft: #67635a;
+  --ink-faint: #8e8878;
   --accent: #8a7a5c;
-  --hairline: #ddd6c7;
-  --hairline-soft: #e7e2d6;
+  --hairline: #e5e0d4;
+  --hairline-soft: #eeebe2;
 }
 
 body {
   background-color: var(--paper);
   background-image:
-    radial-gradient(1300px 520px at 88% -12%, rgba(170, 186, 170, 0.13), transparent 62%),
-    radial-gradient(1000px 460px at -12% 18%, rgba(206, 186, 160, 0.12), transparent 58%),
-    radial-gradient(700px 380px at 50% 120%, rgba(190, 180, 158, 0.1), transparent 60%);
+    radial-gradient(1300px 520px at 88% -12%, rgba(170, 186, 170, 0.1), transparent 62%),
+    radial-gradient(1000px 460px at -12% 18%, rgba(206, 186, 160, 0.09), transparent 58%),
+    radial-gradient(700px 380px at 50% 120%, rgba(190, 180, 158, 0.08), transparent 60%);
   color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* 细腻纸纹颗粒（极低透明度，增加纸的触感） */
@@ -149,7 +150,7 @@ body::before {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.028;
+  opacity: 0.022;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
@@ -183,8 +184,17 @@ body::before {
   height: 5px;
 }
 .pretty-scroll::-webkit-scrollbar-thumb {
-  background: #d5cec0;
+  background: #dcd6c8;
   border-radius: 999px;
+}
+
+/* 移动端隐藏导航滚动条（可滑动但无滚动条痕迹） */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 .pretty-scroll::-webkit-scrollbar-track {
   background: transparent;

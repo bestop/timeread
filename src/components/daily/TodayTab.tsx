@@ -78,7 +78,7 @@ export function TodayTab({ bgCount, quoteCount }: { bgCount: number; quoteCount:
       : '自动取色';
 
   return (
-    <div className="grid items-start gap-12 lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)] xl:gap-16">
+    <div className="grid items-start gap-10 sm:gap-12 lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)] xl:gap-16">
       {/* 卡片区：留白装裱 + 竖排标注 */}
       <div>
         <div className="mat-frame relative mx-auto w-full max-w-[420px]">
@@ -92,7 +92,7 @@ export function TodayTab({ bgCount, quoteCount }: { bgCount: number; quoteCount:
                   src={info.imageUrl}
                   alt={`日签 ${friendlyDate(info.date)}`}
                   fill
-                  sizes="(max-width: 1024px) 90vw, 430px"
+                  sizes="(max-width: 1024px) 92vw, 430px"
                   className="object-cover"
                   priority
                   unoptimized
@@ -117,7 +117,7 @@ export function TodayTab({ bgCount, quoteCount }: { bgCount: number; quoteCount:
         <div className="mx-auto mt-8 flex w-full max-w-[420px] gap-3">
           <a
             href={info?.imageUrl ?? '#'}
-            download={`日签-${info?.date ?? ''}.jpg`}
+            download={`时光贴-${info?.date ?? ''}.jpg`}
             aria-disabled={!info}
             className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] text-sm tracking-[0.14em] text-[var(--paper)] transition-colors duration-300 ${
               info ? 'hover:bg-[#3a362f]' : 'pointer-events-none opacity-40'
@@ -224,14 +224,14 @@ export function TodayTab({ bgCount, quoteCount }: { bgCount: number; quoteCount:
         </div>
 
         <div className="mt-8 grid grid-cols-2 border-t border-[var(--hairline)] pt-7">
-          <div className="border-r border-[var(--hairline-soft)] pr-6">
+          <div className="border-r border-[var(--hairline-soft)] pr-4 sm:pr-6">
             <p className="text-xs tracking-[0.2em] text-[var(--ink-faint)]">背景素材</p>
             <p className="font-serif-sc mt-2 text-3xl text-[var(--ink)]">
               {bgCount}
               <span className="ml-1.5 text-sm font-normal text-[var(--ink-soft)]">张</span>
             </p>
           </div>
-          <div className="pl-6">
+          <div className="pl-4 sm:pl-6">
             <p className="text-xs tracking-[0.2em] text-[var(--ink-faint)]">文字素材</p>
             <p className="font-serif-sc mt-2 text-3xl text-[var(--ink)]">
               {quoteCount}

@@ -58,3 +58,6 @@ next-env.d.ts
 /local-*
 .env*
 scripts/verify-shots/
+
+# 本地工具脚本（可能含环境相关配置，不入库）
+/scripts

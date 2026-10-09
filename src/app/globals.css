@@ -141,6 +141,39 @@ body {
     radial-gradient(700px 380px at 50% 120%, rgba(190, 180, 158, 0.08), transparent 60%);
   color: var(--ink);
   -webkit-tap-highlight-color: transparent;
+  scrollbar-width: thin;
+  scrollbar-color: #dcd6c8 transparent;
+}
+
+/* 选中文本：纸墨反转（阅读细节） */
+::selection {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* 全局细滚动条（与页面同气质，不再出现系统粗灰条） */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-thumb {
+  background: #dcd6c8;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 动画克制：尊重系统的减弱动态设置 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* 细腻纸纹颗粒（极低透明度，增加纸的触感） */
@@ -198,6 +231,22 @@ body::before {
 }
 .pretty-scroll::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* 骨架屏：纸色流光（替换默认灰底脉冲，加载也是画面的一部分） */
+[data-slot="skeleton"] {
+  border-radius: 2px;
+  background: linear-gradient(100deg, #efece4 0%, #f7f5ef 45%, #efece4 82%);
+  background-size: 220% 100%;
+  animation: paper-shimmer 1.8s ease-in-out infinite;
+}
+@keyframes paper-shimmer {
+  0% {
+    background-position: 130% 0;
+  }
+  100% {
+    background-position: -110% 0;
+  }
 }
 
 /* 日签卡投影（美术馆式柔和展墙光） */

@@ -23,9 +23,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Trash2, Loader2, CalendarCheck, Check } from 'lucide-react';
+import { Trash2, Loader2, CalendarCheck, Check, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { PALETTE_OPTIONS, PALETTES } from '@/lib/palettes';
+import { PALETTE_OPTIONS } from '@/lib/palettes';
 
 interface BgItem {
   id: string;
@@ -220,9 +220,9 @@ export function BackgroundsTab() {
           if (e.dataTransfer.files?.length) uploadFiles(e.dataTransfer.files);
         }}
         aria-disabled={uploading}
-        className={`mt-6 flex min-h-[148px] cursor-pointer flex-col items-center justify-center gap-2.5 border border-dashed p-6 text-center transition-all duration-300 sm:p-8 ${
+        className={`relative mt-6 flex min-h-[148px] cursor-pointer flex-col items-center justify-center gap-2.5 border border-dashed p-6 text-center transition-all duration-300 after:pointer-events-none after:absolute after:inset-2 after:border after:border-[var(--ink-soft)]/25 after:opacity-0 after:transition-opacity after:duration-300 sm:p-8 ${
           dragOver
-            ? 'border-[var(--ink-soft)] bg-white/70'
+            ? 'border-[var(--ink-soft)] bg-white/70 after:opacity-100'
             : 'border-[var(--hairline)] bg-white/35 hover:border-[var(--ink-faint)] hover:bg-white/55'
         }`}
       >
@@ -235,6 +235,16 @@ export function BackgroundsTab() {
           </>
         ) : (
           <>
+            <span
+              aria-hidden
+              className={`flex h-9 w-9 items-center justify-center rounded-full border transition-colors duration-300 ${
+                dragOver
+                  ? 'border-[var(--ink-soft)] text-[var(--ink-soft)]'
+                  : 'border-[var(--hairline)] text-[var(--ink-faint)]'
+              }`}
+            >
+              <Plus className="h-4 w-4" strokeWidth={1.2} />
+            </span>
             <p className="font-serif-sc text-[15px] tracking-[0.22em] text-[var(--ink-soft)]">
               将图片轻轻放入此处
             </p>
@@ -282,7 +292,7 @@ export function BackgroundsTab() {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
               </div>
-              <div className="space-y-2.5 p-3.5">
+              <div className="space-y-2.5 border-t border-[var(--hairline-soft)] p-3.5">
                 <div className="flex items-center justify-between gap-2">
                   <p className="min-w-0 flex-1 truncate font-serif-sc text-[13px] tracking-wide text-[#33302a]" title={it.label}>
                     {it.label || '未命名'}
@@ -323,11 +333,8 @@ export function BackgroundsTab() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-[11px] text-[var(--ink-faint)]">
-                  文字配色 · {PALETTES[it.palette]?.label ?? '自动取色'}
-                </p>
                 {daily?.backgroundId === it.id ? (
-                  <p className="flex h-8 items-center justify-center gap-1.5 border border-[var(--hairline)] bg-white/60 text-[11px] tracking-[0.18em] text-[var(--accent)]">
+                  <p className="flex h-8 items-center justify-center gap-1.5 border border-[var(--accent)]/30 bg-[var(--accent)]/[0.07] text-[11px] tracking-[0.18em] text-[var(--accent)]">
                     <Check className="h-3.5 w-3.5" strokeWidth={2.2} />
                     今日在用
                   </p>
@@ -336,7 +343,7 @@ export function BackgroundsTab() {
                     onClick={() => pinBg.mutate(it.id)}
                     disabled={pinBg.isPending}
                     aria-label={`将 ${it.label || '此背景'} 选为今日日签`}
-                    className="flex h-8 w-full items-center justify-center gap-1.5 border border-[var(--hairline)] bg-transparent text-[11px] tracking-[0.18em] text-[var(--ink-soft)] transition-all duration-300 hover:border-[var(--ink-faint)] hover:bg-white/60 hover:text-[var(--ink)] active:scale-[0.98] disabled:opacity-40"
+                    className="flex h-8 w-full items-center justify-center gap-1.5 border border-[var(--hairline)] bg-transparent text-[11px] tracking-[0.18em] text-[var(--ink-soft)] transition-all duration-300 hover:border-[var(--ink-faint)] hover:bg-white/60 hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ink)]/60 active:scale-[0.98] disabled:opacity-40"
                   >
                     <CalendarCheck className="h-3.5 w-3.5" strokeWidth={1.6} />
                     选为今日

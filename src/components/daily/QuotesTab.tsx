@@ -279,7 +279,7 @@ export function QuotesTab() {
                           onClick={() => pinQuote.mutate(it.id)}
                           disabled={pinQuote.isPending}
                           aria-label="选为今日日签文字"
-                          className="inline-flex h-8 items-center gap-1.5 rounded-[2px] px-2 text-[11px] tracking-[0.16em] text-[var(--ink-faint)] transition-all duration-300 hover:bg-white/60 hover:text-[var(--ink)] active:scale-[0.97] disabled:opacity-40 sm:h-7"
+                          className="inline-flex h-8 items-center gap-1.5 rounded-[2px] px-2 text-[11px] tracking-[0.16em] text-[var(--ink-faint)] transition-all duration-300 hover:bg-white/60 hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ink)]/60 active:scale-[0.97] disabled:opacity-40 sm:h-7"
                         >
                           <CalendarCheck className="h-3.5 w-3.5" strokeWidth={1.6} />
                           选为今日

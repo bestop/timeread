@@ -64,11 +64,18 @@ function Shell() {
   return (
     <div id="root-shell" className="flex min-h-screen flex-col">
       {/* 头部：细线之下是导航，之上是品牌与日期 */}
-      <header className="sticky top-0 z-40 border-b border-[var(--hairline)] bg-[var(--paper)]/88 backdrop-blur-md">
+      <header className="sticky top-0 z-40 border-b border-[var(--hairline)] bg-[var(--paper)]/88 backdrop-blur-md animate-in fade-in slide-in-from-top-1 duration-700">
         <div className="mx-auto flex max-w-5xl items-end justify-between gap-4 px-5 pb-3 pt-4 sm:px-8 sm:pt-6">
           <div className="flex items-baseline gap-2.5 sm:gap-3">
             <span className="font-serif-sc text-[21px] font-semibold tracking-[0.08em] text-[var(--ink)] sm:text-[22px]">
               时光贴
+            </span>
+            {/* 印章：一枚小小的朱色钤印，落款般收住品牌名 */}
+            <span
+              aria-hidden
+              className="flex h-[19px] w-[19px] shrink-0 -translate-y-[3px] items-center justify-center rounded-[1.5px] bg-[#a8503a] font-serif-sc text-[11px] font-semibold leading-none text-[#f8f1e8] shadow-[0_1px_2px_rgba(30,28,25,0.16)] sm:h-5 sm:w-5 sm:text-[12px]"
+            >
+              贴
             </span>
             <span className="eyebrow !text-[9px] sm:!text-[10px]">TimeTap</span>
             <span className="hidden h-3.5 w-px bg-[var(--hairline)] sm:block" aria-hidden />
@@ -90,7 +97,7 @@ function Shell() {
                   key={t.key}
                   onClick={() => setTab(t.key)}
                   aria-current={activeTab ? 'page' : undefined}
-                  className={`relative shrink-0 pb-3 pt-1.5 text-[13px] transition-colors duration-300 sm:text-sm ${
+                  className={`relative shrink-0 rounded-[2px] pb-3 pt-1.5 text-[13px] transition-colors duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ink)]/60 sm:text-sm ${
                     activeTab ? 'text-[var(--ink)]' : 'text-[var(--ink-faint)] hover:text-[var(--ink-soft)]'
                   }`}
                 >
@@ -133,6 +140,8 @@ function Shell() {
       {/* 页脚：留白居中，一句收束 */}
       <footer className="mt-auto border-t border-[var(--hairline)] bg-[var(--paper-deep)]/50 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-7">
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-1.5 px-5 text-center sm:px-8">
+          {/* 饰点：一枚小小的菱形墨点，如卷尾钤印 */}
+          <span aria-hidden className="mb-1.5 block h-[4px] w-[4px] rotate-45 bg-[var(--accent)]/70" />
           <p className="font-serif-sc text-[13px] tracking-[0.32em] text-[var(--ink-soft)]">
             日日是好日
           </p>

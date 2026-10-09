@@ -37,7 +37,18 @@ export default function RootLayout({
         className={`${serifSC.variable} antialiased bg-background text-foreground min-h-screen flex flex-col`}
       >
         {children}
-        <Toaster position="top-center" richColors />
+        <Toaster
+          position="top-center"
+          toastOptions={{
+            classNames: {
+              toast:
+                '!rounded-[2px] !border-[var(--hairline)] !bg-[var(--paper)] !text-[var(--ink)] !shadow-[0_1px_2px_rgba(30,28,25,0.06),0_12px_36px_-12px_rgba(30,28,25,0.2)]',
+              title: '!font-serif-sc !text-[13px] !tracking-[0.08em] !text-[var(--ink)]',
+              description: '!text-[13px] !text-[var(--ink-soft)]',
+              icon: '!text-[var(--accent)]',
+            },
+          }}
+        />
       </body>
     </html>
   );

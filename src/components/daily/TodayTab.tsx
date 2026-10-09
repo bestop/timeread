@@ -93,7 +93,9 @@ export function TodayTab({ bgCount, quoteCount }: { bgCount: number; quoteCount:
                   alt={`日签 ${friendlyDate(info.date)}`}
                   fill
                   sizes="(max-width: 1024px) 92vw, 430px"
-                  className="object-cover"
+                  className={`object-cover transition-opacity duration-700 ease-out ${
+                    imgLoaded ? 'opacity-100' : 'opacity-0'
+                  }`}
                   priority
                   unoptimized
                   onLoad={() => setImgLoaded(true)}
@@ -119,7 +121,7 @@ export function TodayTab({ bgCount, quoteCount }: { bgCount: number; quoteCount:
             href={info?.imageUrl ?? '#'}
             download={`时光贴-${info?.date ?? ''}.jpg`}
             aria-disabled={!info}
-            className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] text-sm tracking-[0.14em] text-[var(--paper)] transition-all duration-300 active:scale-[0.98] ${
+            className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] text-sm tracking-[0.14em] text-[var(--paper)] transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ink)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)] active:scale-[0.98] ${
               info ? 'hover:bg-[#3a362f]' : 'pointer-events-none opacity-40'
             }`}
           >
@@ -129,7 +131,7 @@ export function TodayTab({ bgCount, quoteCount }: { bgCount: number; quoteCount:
           <button
             onClick={() => regenerate.mutate()}
             disabled={regenerate.isPending || !info}
-            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[2px] border border-[var(--hairline)] bg-transparent text-sm tracking-[0.14em] text-[var(--ink)] transition-all duration-300 hover:border-[var(--ink-faint)] hover:bg-white/40 active:scale-[0.98] disabled:opacity-40"
+            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[2px] border border-[var(--hairline)] bg-transparent text-sm tracking-[0.14em] text-[var(--ink)] transition-all duration-300 hover:border-[var(--ink-faint)] hover:bg-white/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ink)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)] active:scale-[0.98] disabled:opacity-40"
           >
             {regenerate.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.6} />
@@ -147,7 +149,7 @@ export function TodayTab({ bgCount, quoteCount }: { bgCount: number; quoteCount:
             aria-checked={info?.showDate ?? true}
             disabled={setVisibility.isPending || !info}
             onClick={() => setVisibility.mutate(!(info?.showDate ?? true))}
-            className="group flex items-center gap-2.5 rounded-[2px] px-1 py-1.5 transition-opacity duration-300 disabled:opacity-40"
+            className="group flex items-center gap-2.5 rounded-[2px] px-1 py-1.5 transition-opacity duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ink)]/60 disabled:opacity-40"
           >
             <span
               aria-hidden
@@ -183,7 +185,7 @@ export function TodayTab({ bgCount, quoteCount }: { bgCount: number; quoteCount:
             <span className="font-serif-sc text-sm tracking-[0.3em] text-[var(--ink-soft)]">今日之文</span>
             <span className="h-px flex-1 bg-[var(--hairline-soft)]" aria-hidden />
           </div>
-          <div className="mt-4">
+          <div className="mt-4 border-l border-[var(--hairline)] pl-5">
             {info ? (
               <FormattedQuote
                 content={info.quoteContent}
@@ -226,14 +228,14 @@ export function TodayTab({ bgCount, quoteCount }: { bgCount: number; quoteCount:
         <div className="mt-8 grid grid-cols-2 border-t border-[var(--hairline)] pt-7">
           <div className="border-r border-[var(--hairline-soft)] pr-4 sm:pr-6">
             <p className="text-xs tracking-[0.2em] text-[var(--ink-faint)]">背景素材</p>
-            <p className="font-serif-sc mt-2 text-3xl text-[var(--ink)]">
+            <p className="font-serif-sc mt-2 text-3xl tabular-nums text-[var(--ink)]">
               {bgCount}
               <span className="ml-1.5 text-sm font-normal text-[var(--ink-soft)]">张</span>
             </p>
           </div>
           <div className="pl-4 sm:pl-6">
             <p className="text-xs tracking-[0.2em] text-[var(--ink-faint)]">文字素材</p>
-            <p className="font-serif-sc mt-2 text-3xl text-[var(--ink)]">
+            <p className="font-serif-sc mt-2 text-3xl tabular-nums text-[var(--ink)]">
               {quoteCount}
               <span className="ml-1.5 text-sm font-normal text-[var(--ink-soft)]">条</span>
             </p>

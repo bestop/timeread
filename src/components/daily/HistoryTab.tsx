@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -98,6 +99,11 @@ export function HistoryTab() {
             <DialogTitle className="font-serif-sc text-base tracking-[0.14em] text-[var(--ink)]">
               {active ? friendlyDate(active.date) : ''}
             </DialogTitle>
+            {active?.quoteExcerpt && (
+              <DialogDescription className="truncate font-serif-sc text-xs italic tracking-wide text-[var(--ink-faint)]">
+                {active.quoteExcerpt}
+              </DialogDescription>
+            )}
           </DialogHeader>
           {active && (
             <div>

@@ -16,11 +16,11 @@ export interface DailyInfo {
   quoteContent: string;
   quoteFootnote: string | null;
   showDate: boolean; // 图片上是否绘制日期角标（可选显示项，默认显示）
-  updatedAt: number; // 记录最后变更时间（秒），供图片 URL 缓存失效
+  updatedAt: number; // 记录最后变更时间（毫秒），供图片 URL 缓存失效
   image: Buffer; // 已合成日签 JPEG
 }
 
-const nowSec = () => Math.floor(Date.now() / 1000);
+const nowMs = () => Date.now();
 
 /** 按 (date, variant) 确定性挑选素材并合成 */
 async function pickAndCompose(date: string, variant: number, showDate: boolean): Promise<DailyInfo> {
@@ -65,7 +65,7 @@ async function pickAndCompose(date: string, variant: number, showDate: boolean):
     quoteContent: quote?.content ?? FALLBACK_CONTENT,
     quoteFootnote: quote?.footnote ?? null,
     showDate,
-    updatedAt: nowSec(),
+    updatedAt: nowMs(),
     image: buffer,
   };
 }
@@ -88,17 +88,24 @@ export async function ensureDaily(date?: string): Promise<DailyInfo> {
       const last = await db.dailyCard.findFirst({ orderBy: { date: 'desc' }, select: { showDate: true } });
       const showDate = last?.showDate ?? true;
       const picked = await pickAndCompose(d, 0, showDate);
-      await db.dailyCard.create({
-        data: {
-          date: d,
-          backgroundId: picked.backgroundId ?? 'none',
-          quoteId: picked.quoteId ?? 'none',
-          variant: 0,
-          showDate,
-          image: picked.image,
-        },
-      });
-      return picked;
+      try {
+        await db.dailyCard.create({
+          data: {
+            date: d,
+            backgroundId: picked.backgroundId ?? 'none',
+            quoteId: picked.quoteId ?? 'none',
+            variant: 0,
+            showDate,
+            image: picked.image,
+          },
+        });
+        return picked;
+      } catch (e) {
+        // 跨实例并发冷启动：另一实例已建当日记录（date 唯一约束冲突）
+        // → 回读记录并落入下方「记录已存在」路径，而非向用户报错
+        record = await db.dailyCard.findUnique({ where: { date: d } });
+        if (!record) throw e;
+      }
     }
 
     // 记录存在：校验素材仍可用（并行查两条记录，免去逐条 count）
@@ -150,7 +157,7 @@ export async function ensureDaily(date?: string): Promise<DailyInfo> {
         quoteContent: quote?.content ?? FALLBACK_CONTENT,
         quoteFootnote: quote?.footnote ?? null,
         showDate: record.showDate,
-        updatedAt: nowSec(),
+        updatedAt: nowMs(),
         image: buffer,
       };
     }
@@ -165,7 +172,7 @@ export async function ensureDaily(date?: string): Promise<DailyInfo> {
       quoteContent: quote?.content ?? FALLBACK_CONTENT,
       quoteFootnote: quote?.footnote ?? null,
       showDate: record.showDate,
-      updatedAt: record.updatedAt ? Math.floor(new Date(record.updatedAt).getTime() / 1000) : nowSec(),
+      updatedAt: record.updatedAt ? new Date(record.updatedAt).getTime() : nowMs(),
       image: Buffer.from(record.image),
     };
   })();
@@ -245,7 +252,7 @@ export async function listHistory(limit = 60): Promise<
     date: r.date,
     variant: r.variant,
     showDate: r.showDate,
-    updatedAt: r.updatedAt ? Math.floor(new Date(r.updatedAt).getTime() / 1000) : 0,
+    updatedAt: r.updatedAt ? new Date(r.updatedAt).getTime() : 0,
     backgroundLabel: bgLabels.get(r.backgroundId) || '自定义背景',
     quoteExcerpt: (quoteContents.get(r.quoteId) ?? FALLBACK_CONTENT)
       .replace(/[【】]|~~/g, '')

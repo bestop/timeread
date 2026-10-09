@@ -3,8 +3,8 @@
 // 每日日签 · 主页面（单页四区：今日日签 / 背景库 / 文字库 / 往期回顾）
 // 风格：高级 · 优雅 · 克制 · 诗意 —— 纸墨色系、衬线排版、发丝线分隔、竖排标注
 // 服务端状态统一用 TanStack Query 管理
-import { useState } from 'react';
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { TodayTab } from '@/components/daily/TodayTab';
 import { BackgroundsTab } from '@/components/daily/BackgroundsTab';
 import { QuotesTab } from '@/components/daily/QuotesTab';
@@ -37,6 +37,7 @@ function todayCN() {
 
 function Shell() {
   const [tab, setTab] = useState<TabKey>('today');
+  const queryClient = useQueryClient();
   const { data: bgData } = useQuery({
     queryKey: ['backgrounds'],
     queryFn: () => fetchJson<{ items: unknown[] }>('/api/backgrounds'),
@@ -45,7 +46,20 @@ function Shell() {
     queryKey: ['quotes'],
     queryFn: () => fetchJson<{ items: unknown[] }>('/api/quotes'),
   });
-  const [today] = useState(todayCN);
+  const [today, setToday] = useState(todayCN);
+
+  // 跨零点自愈：页面长驻时每分钟核对一次日期，翻日后刷新头部日期并失效日签/往期缓存
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const d = todayCN();
+      if (d !== today) {
+        setToday(d);
+        queryClient.invalidateQueries({ queryKey: ['daily'] });
+        queryClient.invalidateQueries({ queryKey: ['history'] });
+      }
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, [today, queryClient]);
 
   return (
     <div id="root-shell" className="flex min-h-screen flex-col">

@@ -1,7 +1,7 @@
 // 首次启动种子：程序化生成水彩质感初始背景 + 导入参考图文案
 // 图片本体直接写入数据库（Postgres BYTEA / SQLite BLOB），跨实例持久化，不再依赖临时文件
 import sharp from 'sharp';
-import { db, ensureSchema } from './db';
+import { db, ensureSchema, IS_POSTGRES } from './db';
 
 // ---------- 确定性随机 ----------
 export function mulberry32(seed: number) {
@@ -139,11 +139,31 @@ const seedQuoteId = (i: number) => `preset-quote-${i + 1}`;
 
 let seeding: Promise<void> | null = null;
 
+// 播种标记（AppMeta.seeded）：一旦成功播种过，之后即使素材库被用户清空也不再重灌预设
+async function isSeedMarked(): Promise<boolean> {
+  try {
+    const rows = await db.$queryRawUnsafe<{ value: string }[]>(
+      `SELECT "value" FROM "AppMeta" WHERE "key" = 'seeded'`,
+    );
+    return rows.length > 0 && rows[0].value === '1';
+  } catch {
+    return false;
+  }
+}
+
+async function markSeeded(): Promise<void> {
+  const sql = IS_POSTGRES
+    ? `INSERT INTO "AppMeta" ("key", "value") VALUES ('seeded', '1') ON CONFLICT ("key") DO NOTHING`
+    : `INSERT OR IGNORE INTO "AppMeta" ("key", "value") VALUES ('seeded', '1')`;
+  await db.$executeRawUnsafe(sql);
+}
+
 export async function ensureSeeded(): Promise<void> {
   if (seeding) return seeding;
   seeding = (async () => {
     await ensureSchema(); // 空库（Neon 首次接入）自动建表
     try {
+      if (await isSeedMarked()) return;
       const bgCount = await db.background.count();
       const quoteCount = await db.quote.count();
       if (bgCount === 0) {
@@ -171,6 +191,8 @@ export async function ensureSeeded(): Promise<void> {
             });
         }
       }
+      // 存量库（已在用、无标记）也会在此补记标记，后续清空不再重播
+      await markSeeded();
     } catch (e) {
       console.error('[seed] failed:', e);
       seeding = null; // 允许下次重试

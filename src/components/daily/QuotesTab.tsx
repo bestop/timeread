@@ -185,7 +185,13 @@ export function QuotesTab() {
                 placeholder={'把想说的话写在这里，空行分段。\n用【文字】做高亮块，用~~文字~~做下划线。'}
                 className="rounded-[2px] border-[var(--hairline)] bg-white/50 font-serif-sc text-[16px] leading-relaxed text-[#33302a] focus-visible:ring-[var(--ink-faint)]/40 sm:text-[15px]"
               />
-              <p className="text-right text-xs text-[var(--ink-faint)]">{plen} / 500 字</p>
+              <p
+                className={`text-right text-xs ${
+                  plen > 500 ? 'text-[#a8503a]' : 'text-[var(--ink-faint)]'
+                }`}
+              >
+                {plen} / 500 字
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="quote-footnote" className="text-xs tracking-[0.2em] text-[var(--ink-soft)]">
@@ -199,13 +205,20 @@ export function QuotesTab() {
                 className="rounded-[2px] border-[var(--hairline)] bg-white/50 text-[16px] focus-visible:ring-[var(--ink-faint)]/40 sm:text-sm"
               />
               {footnote.length > 0 && (
-                <p className="text-right text-xs text-[var(--ink-faint)]">{footnote.length} / 160</p>
+                <p
+                  className={`text-right text-xs ${
+                    footnote.length > 160 ? 'text-[#a8503a]' : 'text-[var(--ink-faint)]'
+                  }`}
+                >
+                  {footnote.length} / 160
+                </p>
               )}
             </div>
             <button
               onClick={() => createQuote.mutate()}
-              disabled={createQuote.isPending}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] text-sm tracking-[0.18em] text-[var(--paper)] transition-all duration-300 hover:bg-[#3a362f] active:scale-[0.98] disabled:opacity-40"
+              disabled={createQuote.isPending || !content.trim() || plen > 500}
+              aria-disabled={createQuote.isPending || !content.trim() || plen > 500}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] text-sm tracking-[0.18em] text-[var(--paper)] transition-all duration-300 hover:bg-[#3a362f] active:scale-[0.98] disabled:opacity-40 disabled:hover:bg-[var(--ink)] disabled:active:scale-100"
             >
               {createQuote.isPending ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.6} /> : null}
               存入文字库
@@ -342,7 +355,13 @@ export function QuotesTab() {
                 placeholder={'把想说的话写在这里，空行分段。\n用【文字】做高亮块，用~~文字~~做下划线。'}
                 className="rounded-[2px] border-[var(--hairline)] bg-white/50 font-serif-sc text-[16px] leading-relaxed text-[#33302a] focus-visible:ring-[var(--ink-faint)]/40 sm:text-[15px]"
               />
-              <p className="text-right text-xs text-[var(--ink-faint)]">{editPlen} / 500 字</p>
+              <p
+                className={`text-right text-xs ${
+                  editPlen > 500 ? 'text-[#a8503a]' : 'text-[var(--ink-faint)]'
+                }`}
+              >
+                {editPlen} / 500 字
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-quote-footnote" className="text-xs tracking-[0.2em] text-[var(--ink-soft)]">
@@ -356,13 +375,19 @@ export function QuotesTab() {
                 className="rounded-[2px] border-[var(--hairline)] bg-white/50 text-[16px] focus-visible:ring-[var(--ink-faint)]/40 sm:text-sm"
               />
               {editFootnote.length > 0 && (
-                <p className="text-right text-xs text-[var(--ink-faint)]">{editFootnote.length} / 160</p>
+                <p
+                  className={`text-right text-xs ${
+                    editFootnote.length > 160 ? 'text-[#a8503a]' : 'text-[var(--ink-faint)]'
+                  }`}
+                >
+                  {editFootnote.length} / 160
+                </p>
               )}
             </div>
             <button
               onClick={() => updateQuote.mutate()}
-              disabled={updateQuote.isPending || !editContent.trim() || editPlen > 500}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] text-sm tracking-[0.18em] text-[var(--paper)] transition-all duration-300 hover:bg-[#3a362f] active:scale-[0.98] disabled:opacity-40"
+              disabled={updateQuote.isPending || !editContent.trim() || editPlen > 500 || editFootnote.length > 160}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] text-sm tracking-[0.18em] text-[var(--paper)] transition-all duration-300 hover:bg-[#3a362f] active:scale-[0.98] disabled:opacity-40 disabled:hover:bg-[var(--ink)] disabled:active:scale-100"
             >
               {updateQuote.isPending ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.6} /> : null}
               保存修改

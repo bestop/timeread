@@ -303,6 +303,7 @@ export function BackgroundsTab() {
                 >
                   <SelectTrigger
                     size="sm"
+                    aria-label={`文字配色方案（${it.label || '未命名'}）`}
                     className="h-8 w-full border-[var(--hairline)] bg-white/60 text-xs text-[var(--ink-soft)]"
                   >
                     <SelectValue placeholder="配色" />

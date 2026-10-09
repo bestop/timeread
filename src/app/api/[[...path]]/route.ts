@@ -35,7 +35,7 @@ function sanitizeLabel(name: string): string {
 }
 
 function cardImageUrl(info: { date: string; variant: number; showDate: boolean; updatedAt: number }): string {
-  // s=日期显隐，t=记录变更时间：任一变化即生成新 URL，天然避开浏览器缓存
+  // s=日期显隐，t=记录变更时间（毫秒）：任一变化即生成新 URL，天然避开浏览器缓存
   return `/api/card-image?date=${info.date}&v=${info.variant}&s=${info.showDate ? 1 : 0}&t=${info.updatedAt}`;
 }
 
@@ -174,22 +174,11 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     return json({ created, rejected });
   }
 
-  // 换一换：当日重新随机
+  // 换一换：当日重新随机（仅限当日；任意日期参数一律忽略，防止覆写往期卡片）
   if (segs[0] === 'daily' && segs[1] === 'regenerate') {
-    const body = (await req.json().catch(() => ({}))) as { date?: string };
-    const info = await regenerateDaily(body.date);
-    return json({
-      date: info.date,
-      variant: info.variant,
-      backgroundId: info.backgroundId,
-      backgroundLabel: info.backgroundLabel,
-      backgroundPalette: info.backgroundPalette,
-      quoteId: info.quoteId,
-      quoteContent: info.quoteContent,
-      quoteFootnote: info.quoteFootnote,
-      showDate: info.showDate,
-      imageUrl: cardImageUrl(info),
-    });
+    await req.json().catch(() => {});
+    await regenerateDaily();
+    return json(await dailyPayload());
   }
 
   // 日期显隐切换：可选显示项（默认显示，去掉勾选后日签图不绘制日期角标）
@@ -197,11 +186,12 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     const body = (await req.json().catch(() => ({}))) as { showDate?: boolean };
     const showDate = body.showDate !== false; // 缺省视为显示
     const d = todayStr();
-    const existing = await db.dailyCard.findUnique({ where: { date: d } });
-    if (!existing) {
-      await ensureDaily(d); // 先按继承偏好生成当日记录
+    await ensureDaily(d); // 确保当日记录存在（首次访问当日先生成并继承偏好）
+    const rec = await db.dailyCard.findUnique({ where: { date: d }, select: { showDate: true } });
+    if (rec && rec.showDate !== showDate) {
+      // 仅在显隐值真正变化时置空重合成，避免同值重复开销
+      await db.dailyCard.update({ where: { date: d }, data: { showDate, image: null } }).catch(() => {});
     }
-    await db.dailyCard.update({ where: { date: d }, data: { showDate, image: null } }).catch(() => {});
     return json(await dailyPayload(d));
   }
 

@@ -69,6 +69,11 @@ const PG_STATEMENTS = [
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "DailyCard_date_key" ON "DailyCard"("date")`,
+  // 内部标记（如 seeded）：避免用户清空素材库后被冷启动重新灌入预设
+  `CREATE TABLE IF NOT EXISTS "AppMeta" (
+    "key" TEXT NOT NULL PRIMARY KEY,
+    "value" TEXT NOT NULL
+  )`,
 ];
 
 // 旧库升级（Postgres 幂等）：为已存在的 DailyCard 补列
@@ -104,6 +109,11 @@ const SQLITE_STATEMENTS = [
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "DailyCard_date_key" ON "DailyCard"("date")`,
+  // 内部标记（如 seeded）：避免用户清空素材库后被冷启动重新灌入预设
+  `CREATE TABLE IF NOT EXISTS "AppMeta" (
+    "key" TEXT NOT NULL PRIMARY KEY,
+    "value" TEXT NOT NULL
+  )`,
 ];
 
 // 旧库升级（SQLite）：按 PRAGMA 检查后补列

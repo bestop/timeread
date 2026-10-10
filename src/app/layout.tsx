@@ -10,6 +10,14 @@ const serifSC = localFont({
   display: "swap",
 });
 
+// 篆书印章字体：崇羲篆體 14 字子集（22KB），仅用于随日期轮换的印章
+const zhuanSeal = localFont({
+  src: "./fonts/ZhuanShuSeal-subset.ttf",
+  weight: "400",
+  variable: "--font-zhuan",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "时光贴 TimeTap · 每日日签",
   description:
@@ -34,7 +42,7 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <body
-        className={`${serifSC.variable} antialiased bg-background text-foreground min-h-screen flex flex-col`}
+        className={`${serifSC.variable} ${zhuanSeal.variable} antialiased bg-background text-foreground min-h-screen flex flex-col`}
       >
         {children}
         <Toaster

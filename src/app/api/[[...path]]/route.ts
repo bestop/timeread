@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { db } from '@/lib/db';
 import { ensureSeeded } from '@/lib/seed';
-import { ensureDaily, regenerateDaily, listHistory, invalidateCardFor } from '@/lib/daily';
+import { ensureDaily, regenerateDaily, listHistory, invalidateCardFor, composeSquareCard } from '@/lib/daily';
 import { todayStr } from '@/lib/date-utils';
 import { plainLength } from '@/lib/text-parser';
 
@@ -99,16 +99,21 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     return json(await dailyPayload(date ?? undefined));
   }
 
-  // 往期列表
+  // 往期列表（120 条，足够按月分组回溯一年）
   if (segs[0] === 'daily' && segs[1] === 'history') {
-    const items = await listHistory(60);
+    const items = await listHistory(120);
     return json({ items: items.map((it) => ({ ...it, imageUrl: cardImageUrl(it) })) });
   }
 
-  // 日签图片（首次访问自动生成并入库）
+  // 日签图片（首次访问自动生成并入库）；f=square 出 1:1 分享版（按需合成，不入库）
   if (segs[0] === 'card-image' && segs.length === 1) {
-    const date = req.nextUrl.searchParams.get('date') ?? undefined;
+    const q = req.nextUrl.searchParams;
+    const date = q.get('date') ?? undefined;
     const info = await ensureDaily(date ?? undefined);
+    if (q.get('f') === 'square') {
+      const buf = await composeSquareCard(info);
+      return imageResponse(buf, 'public, max-age=86400');
+    }
     return imageResponse(info.image, 'public, max-age=86400');
   }
 

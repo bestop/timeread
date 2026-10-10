@@ -33,6 +33,8 @@ async function fetchDaily(): Promise<DailyInfo> {
 export function TodayTab({ bgCount, quoteCount }: { bgCount: number; quoteCount: number }) {
   const queryClient = useQueryClient();
   const [imgLoaded, setImgLoaded] = useState(false);
+  // 卡片版本：classic = 日签版 3:4；square = 分享版 1:1（微信/朋友圈比例，带篆书印章落款）
+  const [fmt, setFmt] = useState<'classic' | 'square'>('classic');
 
   const { data: info, isLoading } = useQuery({
     queryKey: ['daily'],
@@ -77,19 +79,34 @@ export function TodayTab({ bgCount, quoteCount }: { bgCount: number; quoteCount:
       ? PALETTES[info.backgroundPalette].label
       : '自动取色';
 
+  const shareUrl = info ? `${info.imageUrl}&f=square` : null;
+  const previewUrl = info ? (fmt === 'square' ? shareUrl : info.imageUrl) : null;
+  const downloadName =
+    fmt === 'square' ? `时光贴-分享-${info?.date ?? ''}.jpg` : `时光贴-${info?.date ?? ''}.jpg`;
+  const switchFmt = (next: 'classic' | 'square') => {
+    if (next === fmt) return;
+    setFmt(next);
+    setImgLoaded(false);
+  };
+
   return (
     <div className="grid items-start gap-10 sm:gap-12 lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)] xl:gap-16">
       {/* 卡片区：留白装裱 + 竖排标注 */}
       <div>
         <div className="mat-frame relative mx-auto w-full max-w-[420px]">
-          <div className="relative aspect-[3/4] w-full overflow-hidden rounded-[2px] bg-[var(--paper-deep)] card-shadow">
+          <div
+            className={`relative w-full overflow-hidden rounded-[2px] bg-[var(--paper-deep)] card-shadow transition-[aspect-ratio] duration-500 ${
+              fmt === 'square' ? 'aspect-square' : 'aspect-[3/4]'
+            }`}
+          >
             {isLoading || !info ? (
               <Skeleton className="h-full w-full rounded-none" />
             ) : (
               <>
                 {!imgLoaded && <Skeleton className="absolute inset-0 h-full w-full rounded-none" />}
                 <Image
-                  src={info.imageUrl}
+                  key={fmt}
+                  src={previewUrl ?? ''}
                   alt={`日签 ${friendlyDate(info.date)}`}
                   fill
                   sizes="(max-width: 1024px) 92vw, 430px"
@@ -116,17 +133,43 @@ export function TodayTab({ bgCount, quoteCount }: { bgCount: number; quoteCount:
             </span>
           </div>
         </div>
-        <div className="mx-auto mt-8 flex w-full max-w-[420px] gap-3">
+        {/* 版式切换：日签版 3:4 / 分享版 1:1（朋友圈） */}
+        <div className="mx-auto mt-6 flex w-max items-center rounded-[2px] border border-[var(--hairline)] bg-white/40 p-0.5">
+          {(
+            [
+              { key: 'classic' as const, label: '日签版', ratio: '3:4' },
+              { key: 'square' as const, label: '分享版', ratio: '1:1' },
+            ]
+          ).map((opt) => (
+            <button
+              key={opt.key}
+              onClick={() => switchFmt(opt.key)}
+              aria-pressed={fmt === opt.key}
+              title={opt.key === 'square' ? '适配微信朋友圈的比例，右下角附篆书印章' : '竖版日签卡 3:4'}
+              className={`flex h-8 items-center gap-1.5 rounded-[1px] px-3.5 text-xs tracking-[0.14em] transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ink)]/60 ${
+                fmt === opt.key
+                  ? 'bg-[var(--ink)] text-[var(--paper)]'
+                  : 'text-[var(--ink-faint)] hover:text-[var(--ink)]'
+              }`}
+            >
+              {opt.label}
+              <span className={`text-[9px] tracking-[0.08em] ${fmt === opt.key ? 'text-[var(--paper)]/70' : 'text-[var(--ink-faint)]/70'}`}>
+                {opt.ratio}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="mx-auto mt-3 flex w-full max-w-[420px] gap-3">
           <a
-            href={info?.imageUrl ?? '#'}
-            download={`时光贴-${info?.date ?? ''}.jpg`}
+            href={(fmt === 'square' ? shareUrl : info?.imageUrl) ?? '#'}
+            download={downloadName}
             aria-disabled={!info}
             className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] text-sm tracking-[0.14em] text-[var(--paper)] transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ink)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)] active:scale-[0.98] ${
               info ? 'hover:bg-[#3a362f]' : 'pointer-events-none opacity-40'
             }`}
           >
             <Download className="h-4 w-4" strokeWidth={1.6} />
-            收藏此签
+            {fmt === 'square' ? '收藏分享卡' : '收藏此签'}
           </a>
           <button
             onClick={() => regenerate.mutate()}

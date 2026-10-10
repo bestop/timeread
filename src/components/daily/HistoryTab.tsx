@@ -1,7 +1,7 @@
 'use client';
 
-// 往期回顾：按日期浏览历史日签，点击放大 + 下载
-import { useState } from 'react';
+// 往期回顾：按月份分组浏览历史日签，点击放大 + 下载
+import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Download } from 'lucide-react';
-import { friendlyDate, chineseDate } from '@/lib/date-utils';
+import { friendlyDate, chineseDate, chineseMonthLabel } from '@/lib/date-utils';
 
 interface HistoryItem {
   date: string;
@@ -35,6 +35,18 @@ export function HistoryTab() {
     },
   });
   const items = data?.items ?? null;
+
+  // 按月份分组（YYYY-MM → 当月列表；接口按日期倒序，月份自然从近到远）
+  const monthGroups = useMemo(() => {
+    const map = new Map<string, HistoryItem[]>();
+    for (const it of items ?? []) {
+      const key = it.date.slice(0, 7);
+      const arr = map.get(key);
+      if (arr) arr.push(it);
+      else map.set(key, [it]);
+    }
+    return [...map.entries()];
+  }, [items]);
 
   return (
     <div>
@@ -63,33 +75,46 @@ export function HistoryTab() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-x-5 gap-y-7 sm:grid-cols-3 lg:grid-cols-5">
-            {items.map((it) => (
-              <button
-                key={it.date}
-                onClick={() => setActive(it)}
-                className="lift group rounded-[2px] text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ink)]"
-                aria-label={`查看 ${friendlyDate(it.date)} 的日签`}
-              >
-                <div className="card-shadow-soft relative aspect-[3/4] w-full overflow-hidden rounded-[2px] bg-[var(--paper-deep)]">
-                  <Image
-                    src={it.imageUrl}
-                    alt={`日签 ${friendlyDate(it.date)}`}
-                    fill
-                    sizes="(max-width: 640px) 45vw, 18vw"
-                    className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                    unoptimized
-                  />
-                </div>
-                <p className="font-serif-sc mt-2.5 text-[13px] tracking-wide text-[#33302a]">
-                  {chineseDate(it.date)}
-                </p>
-                <p className="mt-0.5 truncate text-[11px] text-[var(--ink-faint)]" title={it.quoteExcerpt}>
-                  {it.quoteExcerpt}
-                </p>
-              </button>
-            ))}
-          </div>
+          monthGroups.map(([ym, list]) => (
+            <section key={ym} className="mt-12 first:mt-0">
+              {/* 月份题签：中文月份 + 当月张数，发丝线收边 */}
+              <div className="flex items-baseline justify-between border-b border-[var(--hairline)] pb-3">
+                <h3 className="font-serif-sc text-[15px] tracking-[0.3em] text-[var(--ink-soft)]">
+                  {chineseMonthLabel(ym)}
+                </h3>
+                <span className="text-xs tracking-[0.12em] text-[var(--ink-faint)] tabular-nums">
+                  {list.length} 张
+                </span>
+              </div>
+              <div className="mt-6 grid grid-cols-2 gap-x-5 gap-y-7 sm:grid-cols-3 lg:grid-cols-5">
+                {list.map((it) => (
+                  <button
+                    key={it.date}
+                    onClick={() => setActive(it)}
+                    className="lift group rounded-[2px] text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ink)]"
+                    aria-label={`查看 ${friendlyDate(it.date)} 的日签`}
+                  >
+                    <div className="card-shadow-soft relative aspect-[3/4] w-full overflow-hidden rounded-[2px] bg-[var(--paper-deep)]">
+                      <Image
+                        src={it.imageUrl}
+                        alt={`日签 ${friendlyDate(it.date)}`}
+                        fill
+                        sizes="(max-width: 640px) 45vw, 18vw"
+                        className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                        unoptimized
+                      />
+                    </div>
+                    <p className="font-serif-sc mt-2.5 text-[13px] tracking-wide text-[#33302a]">
+                      {chineseDate(it.date)}
+                    </p>
+                    <p className="mt-0.5 truncate text-[11px] text-[var(--ink-faint)]" title={it.quoteExcerpt}>
+                      {it.quoteExcerpt}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))
         )}
       </div>
 

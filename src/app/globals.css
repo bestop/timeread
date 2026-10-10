@@ -196,6 +196,11 @@ body::before {
   font-family: var(--font-serif-sc), "Songti SC", "STSong", "SimSun", serif;
 }
 
+/* 篆书印章（崇羲篆體子集，随日期轮换的印章字符） */
+.font-zhuan {
+  font-family: var(--font-zhuan), var(--font-serif-sc), "Songti SC", serif;
+}
+
 /* 竖排诗意标注 */
 .v-text {
   writing-mode: vertical-rl;

@@ -224,6 +224,31 @@ export async function invalidateCardFor(date: string) {
   await db.dailyCard.updateMany({ where: { date }, data: { image: null } }).catch(() => {});
 }
 
+/**
+ * 分享版卡片（1:1，微信/朋友圈比例）按需合成：
+ * 不入库，URL 自带 t=updatedAt 缓存键，任一变更自动换新图；
+ * 与日签版同底同文同配色，仅重新构图，右下角以篆书印章落款。
+ */
+export async function composeSquareCard(info: DailyInfo): Promise<Buffer> {
+  const bgData =
+    info.backgroundId && info.backgroundId !== 'none'
+      ? await db.background
+          .findUnique({ where: { id: info.backgroundId }, select: { data: true } })
+          .then((r) => (r?.data ? Buffer.from(r.data) : null))
+          .catch(() => null)
+      : null;
+  const { buffer } = await composeCard({
+    backgroundBuffer: bgData,
+    dateStr: info.date,
+    content: info.quoteContent,
+    footnote: info.quoteFootnote,
+    paletteKey: info.backgroundPalette,
+    showDate: info.showDate,
+    format: 'square',
+  });
+  return buffer;
+}
+
 /** 往期列表 */
 export async function listHistory(limit = 60): Promise<
   { date: string; variant: number; showDate: boolean; updatedAt: number; backgroundLabel: string; quoteExcerpt: string }[]

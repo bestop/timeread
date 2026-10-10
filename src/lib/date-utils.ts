@@ -62,6 +62,19 @@ export function chineseDate(dateStr: string): string {
   return `${toChineseNumber(month)}月${toChineseNumber(day)}日`;
 }
 
+/** 中文月份标签（用于往期分组）：“2026-10” → “二〇二六年十月” */
+export function chineseMonthLabel(ym: string): string {
+  const [y, m] = ym.split('-').map(Number);
+  if (!y || !m) return ym;
+  // 年份逐位转中文，0 用「〇」（年份惯用写法）
+  const YEAR_DIGITS = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+  const year = String(y)
+    .split('')
+    .map((ch) => YEAR_DIGITS[Number(ch)] ?? ch)
+    .join('');
+  return `${year}年${toChineseNumber(m)}月`;
+}
+
 /** 阿拉伯日期：2026.10.07 */
 export function numericDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-');

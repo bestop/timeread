@@ -27,3 +27,9 @@ export const FONT_KAI_PATH = resolveFirst(
   path.join(BUNDLED_DIR, 'LXGWWenKai-Regular.ttf'),
   '/usr/share/fonts/truetype/lxgw-wenkai/LXGWWenKai-Regular.ttf',
 );
+
+/** 篆书（印章用，崇羲篆體 14 字子集，22KB） */
+export const FONT_ZHUAN_PATH = resolveFirst(
+  path.join(BUNDLED_DIR, 'ZhuanShuSeal-subset.ttf'),
+  path.join(process.cwd(), 'src', 'app', 'fonts', 'ZhuanShuSeal-subset.ttf'),
+);

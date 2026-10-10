@@ -5,17 +5,63 @@ import * as fontkit from 'fontkit';
 import sharp from 'sharp';
 import { parseContent, type SegStyle, type Segment } from './text-parser';
 import { resolvePalette, type Palette } from './palettes';
-import { FONT_SERIF_PATH, FONT_KAI_PATH } from './fonts';
+import { FONT_SERIF_PATH, FONT_KAI_PATH, FONT_ZHUAN_PATH } from './fonts';
+import { sealCharForDate } from './seal';
 
 export const CARD_W = 1080;
 export const CARD_H = 1440;
 
-const MARGIN_X = 88;
-const DATE_BASELINE = 136;
-const BODY_TOP = 268; // 有日期角标时正文起始线
-const BODY_TOP_DATELESS = 196; // 隐藏日期时正文起始线（上移补偿，保持构图均衡）
-const BODY_BOTTOM = 1318;
-const FOOTER_BASELINE = 1382;
+/** 卡片格式：classic = 日签版 3:4（1080×1440，入库缓存）；square = 分享版 1:1（1080×1080，朋友圈比例，按需合成） */
+export type CardFormat = 'classic' | 'square';
+
+interface Geom {
+  W: number;
+  H: number;
+  MARGIN_X: number;
+  DATE_BASELINE: number;
+  BODY_TOP: number; // 有日期角标时正文起始线
+  BODY_TOP_DATELESS: number; // 隐藏日期时正文起始线
+  BODY_BOTTOM: number;
+  FOOTER_BASELINE: number;
+  SIZES: number[]; // 正文字号候选（从大到小，取第一个能容纳的）
+  DATE_FS: number;
+  FOOTNOTE_FS: number;
+  AMP_FS: number; // '&' 装饰字号（0 = 不绘制）
+  SEAL_SIZE: number; // 印章边长（0 = 不绘制）
+}
+
+const GEOM: Record<CardFormat, Geom> = {
+  classic: {
+    W: 1080,
+    H: 1440,
+    MARGIN_X: 88,
+    DATE_BASELINE: 136,
+    BODY_TOP: 268,
+    BODY_TOP_DATELESS: 196,
+    BODY_BOTTOM: 1318,
+    FOOTER_BASELINE: 1382,
+    SIZES: [58, 54, 50, 46, 42, 38, 34],
+    DATE_FS: 40,
+    FOOTNOTE_FS: 31,
+    AMP_FS: 62,
+    SEAL_SIZE: 0,
+  },
+  square: {
+    W: 1080,
+    H: 1080,
+    MARGIN_X: 76,
+    DATE_BASELINE: 112,
+    BODY_TOP: 224,
+    BODY_TOP_DATELESS: 164,
+    BODY_BOTTOM: 982,
+    FOOTER_BASELINE: 1040,
+    SIZES: [48, 44, 40, 36, 32, 28, 24],
+    DATE_FS: 34,
+    FOOTNOTE_FS: 27,
+    AMP_FS: 0, // 分享版以印章作落款，不再绘制 '&'
+    SEAL_SIZE: 62,
+  },
+};
 
 const CLOSING_PUNCT = new Set(['，', '。', '、', '；', '：', '？', '！', '）', '》', '」', '』', '”', '’', '…', '—', '～', '~', '!', '?', ',', '.', ';', ':']);
 const OPENING_PUNCT = new Set(['（', '《', '「', '『', '“', '‘', '(', '[']);
@@ -31,6 +77,13 @@ function loadFont(fp: string): FontBox {
 
 const serifBox = loadFont(FONT_SERIF_PATH);
 const kaiBox = loadFont(FONT_KAI_PATH);
+// 篆书印章字体（14 字子集）；意外缺失时以宋体兑底，印章依旧可用
+let zhuanBox = serifBox;
+try {
+  zhuanBox = loadFont(FONT_ZHUAN_PATH);
+} catch {
+  /* 字体缺失时保持宋体兑底 */
+}
 
 interface GlyphRun {
   glyphs: { path: { toSVG(): string } }[];
@@ -182,14 +235,15 @@ function layoutParagraphs(
   return { lines: groups, totalH, lh };
 }
 
-export function layoutCard(
+function layoutCard(
   paras: Segment[][],
-  opts?: { baseFs?: number; bodyTop?: number },
+  geom: Geom,
+  opts?: { bodyTop?: number },
 ): LayoutResult {
-  const bodyTop = opts?.bodyTop ?? BODY_TOP;
-  const maxW = CARD_W - MARGIN_X * 2;
-  const availH = BODY_BOTTOM - bodyTop;
-  const sizes = opts?.baseFs ? [opts.baseFs, ...[58, 54, 50, 46, 42, 38].filter((s) => s < opts.baseFs!)] : [58, 54, 50, 46, 42, 38];
+  const bodyTop = opts?.bodyTop ?? geom.BODY_TOP;
+  const maxW = geom.W - geom.MARGIN_X * 2;
+  const availH = geom.BODY_BOTTOM - bodyTop;
+  const sizes = geom.SIZES;
 
   let chosen = sizes[sizes.length - 1];
   let layout = layoutParagraphs(paras, chosen, maxW);
@@ -205,7 +259,7 @@ export function layoutCard(
   }
   // 垂直居中（略微偏上，贴近参考图）；钳制底部不越界
   const availTop = bodyTop + Math.max(0, Math.round((availH - layout.totalH) / 2.4));
-  const blockTop = Math.max(bodyTop, Math.min(availTop, BODY_BOTTOM - layout.totalH));
+  const blockTop = Math.max(bodyTop, Math.min(availTop, geom.BODY_BOTTOM - layout.totalH));
 
   // 分配 x / top（仅在跨越段落边界时空加段距）
   const lines: RenderLine[] = [];
@@ -220,7 +274,7 @@ export function layoutCard(
       y += Math.round(layout.lh * 0.55); // 段间距
     }
     prevWasParaBreak = false;
-    let x = MARGIN_X;
+    let x = geom.MARGIN_X;
     for (const it of g) {
       it.x = Math.round(x);
       x += it.w;
@@ -238,6 +292,7 @@ export interface CardTextOptions {
   footnote?: string | null;
   palette: Palette;
   showDate?: boolean;   // 图片上是否绘制日期角标（可选显示项，默认显示）
+  format?: CardFormat;  // classic = 日签版（默认）；square = 分享版 1:1
 }
 
 function underlineRuns(line: RenderLine): { x: number; w: number }[] {
@@ -259,9 +314,11 @@ function underlineRuns(line: RenderLine): { x: number; w: number }[] {
 export function buildOverlaySvg(opts: CardTextOptions): Buffer {
   const { dateStr, content, footnote, palette } = opts;
   const showDate = opts.showDate !== false; // 默认显示日期
-  const bodyTop = showDate ? BODY_TOP : BODY_TOP_DATELESS;
+  const geom = GEOM[opts.format ?? 'classic'];
+  const { W, H, MARGIN_X } = geom;
+  const bodyTop = showDate ? geom.BODY_TOP : geom.BODY_TOP_DATELESS;
   const paras = parseContent(content);
-  const layout = layoutCard(paras, { bodyTop });
+  const layout = layoutCard(paras, geom, { bodyTop });
   const { text: tc, hlBg, hlText } = palette;
   const fs = layout.fontSize;
   const spacing = Math.round(fs * 0.1);
@@ -270,17 +327,17 @@ export function buildOverlaySvg(opts: CardTextOptions): Buffer {
   // 轻纱
   const washColor = palette.dark ? '#1A1815' : '#FFFFFF';
   const washOp = palette.dark ? 0.1 : 0.06;
-  els.push(`<rect x="0" y="0" width="${CARD_W}" height="${CARD_H}" fill="${washColor}" opacity="${washOp}"/>`);
+  els.push(`<rect x="0" y="0" width="${W}" height="${H}" fill="${washColor}" opacity="${washOp}"/>`);
 
   // 日期角标（字形路径，不依赖环境字体）——可选显示项：默认显示，去掉勾选则不绘制
   if (showDate) {
     const dp = datePartsLocal(dateStr);
-    const dateFs = 40;
-    els.push(textToPathGroup(serifBox, `(${dp})`, MARGIN_X, DATE_BASELINE, dateFs, { fill: tc }));
+    const dateFs = geom.DATE_FS;
+    els.push(textToPathGroup(serifBox, `(${dp})`, MARGIN_X, geom.DATE_BASELINE, dateFs, { fill: tc }));
     const cnDate = chineseDateLocal(dateStr);
     const cnW = advancePx(serifBox, cnDate, dateFs, 6);
     els.push(
-      textToPathGroup(serifBox, cnDate, CARD_W - MARGIN_X - Math.round(cnW - 6), DATE_BASELINE, dateFs, { fill: tc, letterSpacing: 6 }),
+      textToPathGroup(serifBox, cnDate, W - MARGIN_X - Math.round(cnW - 6), geom.DATE_BASELINE, dateFs, { fill: tc, letterSpacing: 6 }),
     );
   }
 
@@ -305,11 +362,14 @@ export function buildOverlaySvg(opts: CardTextOptions): Buffer {
     }
   }
 
-  // 底部：英文注脚（文楷）+ 装饰 &（仅在确有英文注脚时出现，无英文则留白）
+  // 底部：英文注脚（文楷）
+  // 日签版：注脚 + '&'（仅在有英文注脚时出现，无英文则留白）
+  // 分享版：注脚 + 篆书印章落款（随日期轮换），不再绘制 '&'
   if (footnote && footnote.trim()) {
-    let fnFs = 31;
+    let fnFs = geom.FOOTNOTE_FS;
     let fn = footnote.trim();
-    const maxFnW = CARD_W - MARGIN_X * 2 - 140;
+    const tailRoom = geom.SEAL_SIZE > 0 ? geom.SEAL_SIZE + 30 : 140;
+    const maxFnW = W - MARGIN_X * 2 - tailRoom;
     let w = advancePx(kaiBox, fn, fnFs, 1);
     while (w > maxFnW && fnFs > 20) {
       fnFs -= 2;
@@ -320,11 +380,29 @@ export function buildOverlaySvg(opts: CardTextOptions): Buffer {
       fn = fn + '…';
     }
     const fnColor = hexWithAlpha(tc, 0.72);
-    els.push(textToPathGroup(kaiBox, fn, MARGIN_X, FOOTER_BASELINE, fnFs, { fill: fnColor, letterSpacing: 1 }));
-    els.push(textToPathGroup(serifBox, '&', CARD_W - MARGIN_X - 8, FOOTER_BASELINE + 6, 62, { fill: tc, opacity: 0.9 }));
+    els.push(textToPathGroup(kaiBox, fn, MARGIN_X, geom.FOOTER_BASELINE, fnFs, { fill: fnColor, letterSpacing: 1 }));
+    if (geom.AMP_FS > 0) {
+      els.push(textToPathGroup(serifBox, '&', W - MARGIN_X - 8, geom.FOOTER_BASELINE + 6, geom.AMP_FS, { fill: tc, opacity: 0.9 }));
+    }
+  } else if (geom.AMP_FS > 0) {
+    els.push(textToPathGroup(serifBox, '&', W - MARGIN_X - 8, geom.FOOTER_BASELINE + 6, geom.AMP_FS, { fill: tc, opacity: 0.9 }));
   }
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_W}" height="${CARD_H}" viewBox="0 0 ${CARD_W} ${CARD_H}">
+  // 篆书印章（分享版落款）：朱底白字，随日期轮换
+  if (geom.SEAL_SIZE > 0) {
+    const s = geom.SEAL_SIZE;
+    const sx = W - MARGIN_X - s;
+    const sy = geom.FOOTER_BASELINE - s + 12;
+    const ch = sealCharForDate(dateStr);
+    const fsC = Math.round(s * 0.6);
+    const wC = advancePx(zhuanBox, ch, fsC, 0);
+    els.push(
+      `<rect x="${sx}" y="${sy}" width="${s}" height="${s}" rx="7" fill="#A8503A" opacity="0.94"/>`,
+      textToPathGroup(zhuanBox, ch, Math.round(sx + (s - wC) / 2), Math.round(sy + s / 2 + fsC * 0.37), fsC, { fill: '#F8F1E8' }),
+    );
+  }
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
 ${els.join('\n')}
 ${rects.join('\n')}
 ${uls.join('\n')}
@@ -370,6 +448,7 @@ export interface ComposeInput {
   footnote?: string | null;
   paletteKey: string; // 'auto' 或具体 key
   showDate?: boolean; // 图片上是否绘制日期角标（默认显示）
+  format?: CardFormat; // classic = 日签版 3:4（默认）；square = 分享版 1:1
 }
 
 export interface ComposeResult {
@@ -378,19 +457,20 @@ export interface ComposeResult {
 }
 
 export async function composeCard(input: ComposeInput): Promise<ComposeResult> {
+  const geom = GEOM[input.format ?? 'classic'];
   let imgBuf: Buffer;
   let stats: { r: number; g: number; b: number } | undefined;
 
   if (input.backgroundBuffer && input.backgroundBuffer.length > 0) {
     imgBuf = await sharp(input.backgroundBuffer)
       .rotate()
-      .resize(CARD_W, CARD_H, { fit: 'cover', position: 'centre' })
+      .resize(geom.W, geom.H, { fit: 'cover', position: 'centre' })
       .toBuffer();
     const st = await sharp(imgBuf).stats();
     stats = { r: st.channels[0].mean, g: st.channels[1].mean, b: st.channels[2].mean };
   } else {
     // 无背景时的素色兜底
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_W}" height="${CARD_H}"><rect width="${CARD_W}" height="${CARD_H}" fill="#EDEAE2"/><ellipse cx="300" cy="400" rx="420" ry="300" fill="#D9CFC0" opacity="0.5"/><ellipse cx="820" cy="1000" rx="460" ry="360" fill="#C9C2B2" opacity="0.4"/></svg>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${geom.W}" height="${geom.H}"><rect width="${geom.W}" height="${geom.H}" fill="#EDEAE2"/><ellipse cx="${Math.round(geom.W * 0.28)}" cy="${Math.round(geom.H * 0.28)}" rx="420" ry="300" fill="#D9CFC0" opacity="0.5"/><ellipse cx="${Math.round(geom.W * 0.76)}" cy="${Math.round(geom.H * 0.7)}" rx="460" ry="360" fill="#C9C2B2" opacity="0.4"/></svg>`;
     imgBuf = await sharp(Buffer.from(svg)).blur(60).toBuffer();
     stats = { r: 226, g: 220, b: 208 };
   }
@@ -402,6 +482,7 @@ export async function composeCard(input: ComposeInput): Promise<ComposeResult> {
     footnote: input.footnote,
     palette,
     showDate: input.showDate,
+    format: input.format,
   });
 
   const buffer = await sharp(imgBuf)

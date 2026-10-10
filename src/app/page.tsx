@@ -10,6 +10,7 @@ import { BackgroundsTab } from '@/components/daily/BackgroundsTab';
 import { QuotesTab } from '@/components/daily/QuotesTab';
 import { HistoryTab } from '@/components/daily/HistoryTab';
 import { friendlyDate } from '@/lib/date-utils';
+import { sealCharForDate } from '@/lib/seal';
 
 type TabKey = 'today' | 'backgrounds' | 'quotes' | 'history';
 
@@ -70,12 +71,13 @@ function Shell() {
             <span className="font-serif-sc text-[21px] font-semibold tracking-[0.08em] text-[var(--ink)] sm:text-[22px]">
               时光贴
             </span>
-            {/* 印章：一枚小小的朱色钤印，落款般收住品牌名 */}
+            {/* 印章：朱色钤印，篆书字随日期轮换（崇羲篆體），落款般收住品牌名 */}
             <span
               aria-hidden
-              className="flex h-[19px] w-[19px] shrink-0 -translate-y-[3px] items-center justify-center rounded-[1.5px] bg-[#a8503a] font-serif-sc text-[11px] font-semibold leading-none text-[#f8f1e8] shadow-[0_1px_2px_rgba(30,28,25,0.16)] sm:h-5 sm:w-5 sm:text-[12px]"
+              title={`今日印章 · ${sealCharForDate(today)}`}
+              className="font-zhuan flex h-[20px] w-[20px] shrink-0 -translate-y-[3px] items-center justify-center rounded-[2px] bg-[#a8503a] text-[13px] leading-none text-[#f8f1e8] shadow-[0_1px_2px_rgba(30,28,25,0.16)] sm:h-[22px] sm:w-[22px] sm:text-[14px]"
             >
-              贴
+              {sealCharForDate(today)}
             </span>
             <span className="eyebrow !text-[9px] sm:!text-[10px]">TimeTap</span>
             <span className="hidden h-3.5 w-px bg-[var(--hairline)] sm:block" aria-hidden />
